@@ -1,45 +1,64 @@
 /**
- * Sample React Native App
- * https://github.com/facebook/react-native
- *
+ * CA Mobile Survey
  * @format
  */
 
-import { NewAppScreen } from '@react-native/new-app-screen';
-import { StatusBar, StyleSheet, useColorScheme, View } from 'react-native';
-import {
-  SafeAreaProvider,
-  useSafeAreaInsets,
-} from 'react-native-safe-area-context';
+import React from 'react';
+import { NavigationContainer } from '@react-navigation/native';
+import { createDrawerNavigator } from '@react-navigation/drawer';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { StyleSheet } from 'react-native';
 
-function App() {
-  const isDarkMode = useColorScheme() === 'dark';
+import DashboardScreen from './src/screens/DashboardScreen';
+import SurveyScreen from './src/screens/SurveyScreen';
+import SurveySelesaiScreen from './src/screens/SurveySelesaiScreen';
+import DrawerContent from './src/components/DrawerContent';
+import { Colors } from './src/theme/colors';
+import { RootDrawerParamList, RootStackParamList } from './src/types';
 
+const Drawer = createDrawerNavigator<RootDrawerParamList>();
+const Stack = createNativeStackNavigator<RootStackParamList>();
+
+/** Stack Navigator: Dashboard → Survey → SurveySelesai */
+function MainStack() {
   return (
-    <SafeAreaProvider>
-      <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
-      <AppContent />
-    </SafeAreaProvider>
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="Dashboard" component={DashboardScreen} />
+      <Stack.Screen name="Survey" component={SurveyScreen} />
+      <Stack.Screen name="SurveySelesai" component={SurveySelesaiScreen} />
+    </Stack.Navigator>
   );
 }
 
-function AppContent() {
-  const safeAreaInsets = useSafeAreaInsets();
-
+/** Root: Drawer wraps the Stack */
+function App() {
   return (
-    <View style={styles.container}>
-      <NewAppScreen
-        templateFileName="App.tsx"
-        safeAreaInsets={safeAreaInsets}
-      />
-    </View>
+    <GestureHandlerRootView style={styles.root}>
+      <SafeAreaProvider>
+        <NavigationContainer>
+          <Drawer.Navigator
+            drawerContent={(props) => <DrawerContent {...props} />}
+            screenOptions={{
+              headerShown: false,
+              drawerStyle: {
+                width: 280,
+                backgroundColor: Colors.white,
+              },
+              drawerType: 'slide',
+              overlayColor: 'rgba(0,0,0,0.4)',
+            }}>
+            <Drawer.Screen name="Main" component={MainStack} />
+          </Drawer.Navigator>
+        </NavigationContainer>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
+  root: { flex: 1 },
 });
 
 export default App;

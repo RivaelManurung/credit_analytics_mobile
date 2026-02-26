@@ -1,0 +1,22 @@
+export const Colors = {
+    primary: '#0052CC',
+    primaryDark: '#003D99',l
+    primaryLight: '#E6EEFF',
+    white: '#FFFFFF',
+    black: '#000000',
+    gray50: '#F9FAFB',
+    gray100: '#F3F4F6',
+    gray200: '#E5E7EB',
+    gray400: '#9CA3AF',
+    gray600: '#4B5563',
+    gray800: '#1F2937',
+    danger: '#DC2626',
+    dangerLight: '#FEE2E2',
+    success: '#16A34A',
+    successLight: '#DCFCE7',
+    textPrimary: '#111827',
+    textSecondary: '#6B7280',
+    border: '#E5E7EB',
+    background: '#F5F7FA',
+    cardBackground: '#FFFFFF',
+};
