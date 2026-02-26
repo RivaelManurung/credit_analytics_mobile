@@ -18,7 +18,7 @@ import { formatRupiah } from '../data/mockData';
 
 type SurveyRouteProp = RouteProp<RootStackParamList, 'Survey'>;
 type SurveyNavProp = NativeStackNavigationProp<RootStackParamList, 'Survey'>;
-
+``
 const SurveyScreen: React.FC = () => {
     const navigation = useNavigation<SurveyNavProp>();
     const route = useRoute<SurveyRouteProp>();

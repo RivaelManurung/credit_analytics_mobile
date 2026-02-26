@@ -11,12 +11,12 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StyleSheet } from 'react-native';
 
-import DashboardScreen from './src/screens/DashboardScreen';
-import SurveyScreen from './src/screens/SurveyScreen';
-import SurveySelesaiScreen from './src/screens/SurveySelesaiScreen';
-import DrawerContent from './src/components/DrawerContent';
-import { Colors } from './src/theme/colors';
-import { RootDrawerParamList, RootStackParamList } from './src/types';
+import DashboardScreen from './app/src/screens/DashboardScreen';
+import SurveyScreen from './app/src/screens/SurveyScreen';
+import SurveySelesaiScreen from './app/src/screens/SurveySelesaiScreen';
+import DrawerContent from './app/src/components/DrawerContent';
+import { Colors } from './app/src/theme/colors';
+import { RootDrawerParamList, RootStackParamList } from './app/src/types';
 
 const Drawer = createDrawerNavigator<RootDrawerParamList>();
 const Stack = createNativeStackNavigator<RootStackParamList>();
