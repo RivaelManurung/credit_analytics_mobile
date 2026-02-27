@@ -5,12 +5,14 @@
  * @format
  */
 
-import { NewAppScreen } from '@react-native/new-app-screen';
+import React, { useState } from 'react';
 import { StatusBar, StyleSheet, useColorScheme, View } from 'react-native';
 import {
   SafeAreaProvider,
   useSafeAreaInsets,
 } from 'react-native-safe-area-context';
+import { DashboardScreen } from './src/presentation/screens/DashboardScreen';
+import { SurveyFormScreen } from './src/presentation/screens/SurveyFormScreen';
 
 function App() {
   const isDarkMode = useColorScheme() === 'dark';
@@ -24,14 +26,28 @@ function App() {
 }
 
 function AppContent() {
-  const safeAreaInsets = useSafeAreaInsets();
+  const [currentScreen, setCurrentScreen] = useState<'dashboard' | 'survey'>(
+    'dashboard',
+  );
+  const [activeSurveyId, setActiveSurveyId] = useState<string | null>(null);
+
+  const navigateToSurvey = (surveyId: string) => {
+    setActiveSurveyId(surveyId);
+    setCurrentScreen('survey');
+  };
+
+  const navigateBack = () => {
+    setCurrentScreen('dashboard');
+    setActiveSurveyId(null);
+  };
 
   return (
     <View style={styles.container}>
-      <NewAppScreen
-        templateFileName="App.tsx"
-        safeAreaInsets={safeAreaInsets}
-      />
+      {currentScreen === 'dashboard' ? (
+        <DashboardScreen onStartSurvey={navigateToSurvey} />
+      ) : (
+        <SurveyFormScreen surveyId={activeSurveyId!} onBack={navigateBack} />
+      )}
     </View>
   );
 }
