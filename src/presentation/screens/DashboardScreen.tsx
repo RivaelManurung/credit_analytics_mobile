@@ -115,6 +115,7 @@ export function DashboardScreen({ onStartSurvey }: DashboardScreenProps) {
                             key={app.id}
                             name={app.applicantName || 'Nasabah #' + app.id.substring(0, 5)}
                             status={app.status || 'PENDING'}
+                            activeStatus={survey ? survey.status : 'PENDING'}
                             idApp={app.id.substring(0, 8)}
                             amount={app.loanAmount ? `Rp ${app.loanAmount}` : '-'}
                             address={survey?.surveyPurpose || 'Menunggu Survey'}

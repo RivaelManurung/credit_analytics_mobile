@@ -5,15 +5,16 @@ import { ChevronRight, CreditCard, MapPin } from 'lucide-react-native';
 interface ClientCardProps {
     name: string;
     status: string;
+    activeStatus: string;
     idApp: string;
     amount: string;
     address: string;
     onPressStart: () => void;
 }
 
-export function ClientCard({ name, status, idApp, amount, address, onPressStart }: ClientCardProps) {
-    const isStarted = status === 'IN_PROGRESS';
-    const isSubmitted = status === 'SUBMITTED';
+export function ClientCard({ name, status, activeStatus, idApp, amount, address, onPressStart }: ClientCardProps) {
+    const isStarted = activeStatus === 'IN_PROGRESS';
+    const isSubmitted = activeStatus === 'SUBMITTED';
 
     return (
         <View className="bg-white rounded-2xl p-5 mb-4 shadow-sm border border-slate-50">
