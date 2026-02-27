@@ -3,6 +3,7 @@ import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, TextInput,
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ChevronLeft, Camera, CheckCircle, Info } from 'lucide-react-native';
 import { useSurvey, useSurveyControl } from '../hooks/useSurveys';
+import { useAuth } from '../context/AuthContext';
 
 interface SurveyFormScreenProps {
     surveyId: string;
@@ -11,6 +12,7 @@ interface SurveyFormScreenProps {
 
 export function SurveyFormScreen({ surveyId, onBack }: SurveyFormScreenProps) {
     const insets = useSafeAreaInsets();
+    const { surveyorId } = useAuth();
     const { survey, loading, error } = useSurvey(surveyId);
     const { submitSurvey, loading: submitting } = useSurveyControl();
 
@@ -32,7 +34,7 @@ export function SurveyFormScreen({ surveyId, onBack }: SurveyFormScreenProps) {
             return;
         }
 
-        const result = await submitSurvey(surveyId, '0195c1c2-0001-7000-bb34-000000000001');
+        const result = await submitSurvey(surveyId, surveyorId!);
         if (result) {
             Alert.alert('Berhasil', 'Survey telah dikirim.', [{ text: 'OK', onPress: onBack }]);
         }

@@ -7,20 +7,20 @@ import { User, ClipboardList, Clock } from 'lucide-react-native';
 import { useApplications } from '../hooks/useApplications';
 import { useMySurveys, useSurveyControl } from '../hooks/useSurveys';
 import { ApplicationSurvey } from '../../gen/survey/v1/survey_pb';
-
-// Mocked logged in user ID from seed data
-const LOGGED_IN_SURVEYOR_ID = '0195c1c2-0001-7000-bb34-000000000001';
+import { useAuth } from '../context/AuthContext';
 
 interface DashboardScreenProps {
     onStartSurvey: (surveyId: string) => void;
 }
 
 export function DashboardScreen({ onStartSurvey }: DashboardScreenProps) {
+    const { surveyorId } = useAuth();
+
     // Currently fetching applications to show as "Daftar Nasabah"
     const { applications, loading: appLoading, error: appError, refetch: refetchApps } = useApplications();
 
     // We still need survey info to know if a survey is in progress
-    const { surveys, loading: surveyLoading, error: surveyError, refetch: refetchSurveys } = useMySurveys(LOGGED_IN_SURVEYOR_ID);
+    const { surveys, loading: surveyLoading, error: surveyError, refetch: refetchSurveys } = useMySurveys(surveyorId || '');
     const { startSurvey, assignSurvey } = useSurveyControl();
 
     const loading = appLoading || surveyLoading;
@@ -50,12 +50,12 @@ export function DashboardScreen({ onStartSurvey }: DashboardScreenProps) {
         if (!existingSurvey) {
             console.log('No survey found for application:', appId, ', assigning one automatically.');
             // Auto assign a default survey to log in surveyor
-            existingSurvey = await assignSurvey(appId, "SURVEY_STANDARD_001", "FIELD_SURVEY", LOGGED_IN_SURVEYOR_ID, "Verifikasi Data Nasabah (Auto-assigned)");
+            existingSurvey = await assignSurvey(appId, "SURVEY_STANDARD_001", "FIELD_SURVEY", surveyorId!, "Verifikasi Data Nasabah (Auto-assigned)");
         }
 
         if (existingSurvey) {
             console.log('Starting existing survey:', existingSurvey.id);
-            await startSurvey(existingSurvey.id, LOGGED_IN_SURVEYOR_ID);
+            await startSurvey(existingSurvey.id, surveyorId!);
             onStartSurvey(existingSurvey.id); // Navigate to survey screen
         } else {
             console.error('Failed to create or assign survey for application', appId);

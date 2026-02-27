@@ -13,6 +13,8 @@ import {
 } from 'react-native-safe-area-context';
 import { DashboardScreen } from './src/presentation/screens/DashboardScreen';
 import { SurveyFormScreen } from './src/presentation/screens/SurveyFormScreen';
+import { LoginScreen } from './src/presentation/screens/LoginScreen';
+import { AuthProvider, useAuth } from './src/presentation/context/AuthContext';
 
 function App() {
   const isDarkMode = useColorScheme() === 'dark';
@@ -20,15 +22,16 @@ function App() {
   return (
     <SafeAreaProvider>
       <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
-      <AppContent />
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
     </SafeAreaProvider>
   );
 }
 
 function AppContent() {
-  const [currentScreen, setCurrentScreen] = useState<'dashboard' | 'survey'>(
-    'dashboard',
-  );
+  const { surveyorId } = useAuth();
+  const [currentScreen, setCurrentScreen] = useState<'dashboard' | 'survey'>('dashboard');
   const [activeSurveyId, setActiveSurveyId] = useState<string | null>(null);
 
   const navigateToSurvey = (surveyId: string) => {
@@ -40,6 +43,10 @@ function AppContent() {
     setCurrentScreen('dashboard');
     setActiveSurveyId(null);
   };
+
+  if (!surveyorId) {
+    return <LoginScreen />;
+  }
 
   return (
     <View style={styles.container}>
