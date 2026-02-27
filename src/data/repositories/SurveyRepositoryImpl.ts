@@ -66,13 +66,31 @@ export class SurveyRepositoryImpl {
     }
 
     async assignSurvey(applicationId: string, templateId: string, surveyType: string, assignedTo: string, surveyPurpose: string): Promise<ApplicationSurvey> {
-        return await this.client.assignSurvey(new AssignSurveyRequest({
-            applicationId,
-            templateId,
-            surveyType,
-            assignedTo,
-            surveyPurpose
-        }));
+        try {
+            return await this.client.assignSurvey(new AssignSurveyRequest({
+                applicationId,
+                templateId,
+                surveyType,
+                assignedTo,
+                surveyPurpose
+            }));
+        } catch (error) {
+            console.warn('[gRPC ERROR] Falling back to REST for ASSIGN Survey');
+            const res = await fetch(`${this.baseUrl}/v1/applications/${applicationId}/surveys`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    templateId,
+                    surveyType,
+                    assignedTo,
+                    surveyPurpose
+                })
+            });
+            if (res.ok) {
+                return ApplicationSurvey.fromJson(await res.json());
+            }
+            throw error;
+        }
     }
 
     async startSurvey(id: string, userId: string): Promise<ApplicationSurvey> {

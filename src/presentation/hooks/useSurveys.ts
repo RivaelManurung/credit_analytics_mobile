@@ -86,7 +86,21 @@ export function useSurveyControl() {
         }
     };
 
-    return { startSurvey, submitSurvey, loading, error };
+    const assignSurvey = async (applicationId: string, templateId: string, surveyType: string, assignedTo: string, surveyPurpose: string): Promise<ApplicationSurvey | null> => {
+        try {
+            setLoading(true);
+            setError(null);
+            const survey = await surveyRepo.assignSurvey(applicationId, templateId, surveyType, assignedTo, surveyPurpose);
+            return survey;
+        } catch (err) {
+            setError(err instanceof Error ? err : new Error('Failed to assign survey'));
+            return null;
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return { startSurvey, submitSurvey, assignSurvey, loading, error };
 }
 export function useSurvey(id: string) {
     const [survey, setSurvey] = useState<ApplicationSurvey | null>(null);
