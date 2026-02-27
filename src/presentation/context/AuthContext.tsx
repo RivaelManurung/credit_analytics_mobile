@@ -9,7 +9,8 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-    const [surveyorId, setSurveyorId] = useState<string | null>(null);
+    // Defaulting to auto-login to bypass LoginScreen for now
+    const [surveyorId, setSurveyorId] = useState<string | null>('0195c1c2-0001-7000-bb34-000000000001');
 
     const login = (id: string) => {
         setSurveyorId(id);
