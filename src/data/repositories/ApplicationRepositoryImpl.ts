@@ -27,7 +27,7 @@ export class ApplicationRepositoryImpl {
                     const data = await res.json();
                     console.log('[DEBUG] REST Applications Success');
                     // Map REST JSON to Proto objects
-                    return (data.applications || []).map((app: any) => new Application(app));
+                    return (data.applications || []).map((app: any) => Application.fromJson(app));
                 }
                 throw grpcErr;
             }
@@ -60,7 +60,7 @@ export class ApplicationRepositoryImpl {
                 })
             });
             if (res.ok) {
-                return new Application(await res.json());
+                return Application.fromJson(await res.json());
             }
             throw grpcErr;
         }

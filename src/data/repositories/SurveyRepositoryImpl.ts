@@ -24,7 +24,7 @@ export class SurveyRepositoryImpl {
             console.warn('[gRPC] Falling back to REST for GET Survey');
             const res = await fetch(`${this.baseUrl}/v1/surveys/${id}`);
             if (res.ok) {
-                return new ApplicationSurvey(await res.json());
+                return ApplicationSurvey.fromJson(await res.json());
             }
             throw error;
         }
@@ -32,7 +32,7 @@ export class SurveyRepositoryImpl {
 
     async listSurveys(assignedTo?: string, status?: string): Promise<ApplicationSurvey[]> {
         try {
-            console.log(`[gRPC] LIST Surveys: assignedTo=${assignedTo}, status=${status}`);
+            console.log(`[gRPC] LIST Surveys: assignedTo=${assignedTo}${status ? `, status=${status}` : ''}`);
             const response = await this.client.listSurveys(new ListSurveysRequest({ assignedTo, status }));
             return response.surveys;
         } catch (error) {
@@ -45,7 +45,7 @@ export class SurveyRepositoryImpl {
             const res = await fetch(url);
             if (res.ok) {
                 const data = await res.json();
-                return (data.surveys || []).map((s: any) => new ApplicationSurvey(s));
+                return (data.surveys || []).map((s: any) => ApplicationSurvey.fromJson(s));
             }
             throw error;
         }
@@ -59,7 +59,7 @@ export class SurveyRepositoryImpl {
             const res = await fetch(`${this.baseUrl}/v1/applications/${applicationId}/surveys`);
             if (res.ok) {
                 const data = await res.json();
-                return (data.surveys || []).map((s: any) => new ApplicationSurvey(s));
+                return (data.surveys || []).map((s: any) => ApplicationSurvey.fromJson(s));
             }
             throw error;
         }
@@ -86,7 +86,7 @@ export class SurveyRepositoryImpl {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ user_id: userId })
             });
-            if (res.ok) return new ApplicationSurvey(await res.json());
+            if (res.ok) return ApplicationSurvey.fromJson(await res.json());
             throw error;
         }
     }
@@ -102,7 +102,7 @@ export class SurveyRepositoryImpl {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ user_id: userId })
             });
-            if (res.ok) return new ApplicationSurvey(await res.json());
+            if (res.ok) return ApplicationSurvey.fromJson(await res.json());
             throw error;
         }
     }
