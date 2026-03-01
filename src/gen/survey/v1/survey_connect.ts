@@ -3,7 +3,7 @@
 /* eslint-disable */
 // @ts-nocheck
 
-import { ApplicationSurvey, AssignSurveyRequest, CreateSurveyTemplateRequest, GetSurveyRequest, ListSurveysByApplicationRequest, ListSurveysByApplicationResponse, ListSurveysRequest, ListSurveysResponse, ListSurveyTemplatesRequest, ListSurveyTemplatesResponse, StartSurveyRequest, SubmitSurveyAnswerRequest, SubmitSurveyRequest, SurveyAnswer, SurveyEvidence, SurveyTemplate, UploadSurveyEvidenceRequest, VerifySurveyRequest } from "./survey_pb";
+import { ApplicationSurvey, AssignSurveyRequest, CreateSurveyTemplateRequest, GetSurveyRequest, GetSurveyTemplateRequest, ListSurveysByApplicationRequest, ListSurveysByApplicationResponse, ListSurveysRequest, ListSurveysResponse, ListSurveyTemplatesRequest, ListSurveyTemplatesResponse, StartSurveyRequest, SubmitSurveyAnswerRequest, SubmitSurveyRequest, SurveyAnswer, SurveyEvidence, SurveyTemplate, UploadSurveyEvidenceRequest, VerifySurveyRequest } from "./survey_pb";
 import { MethodKind } from "@bufbuild/protobuf";
 
 /**
@@ -101,6 +101,17 @@ export const SurveyService = {
       name: "UploadSurveyEvidence",
       I: UploadSurveyEvidenceRequest,
       O: SurveyEvidence,
+      kind: MethodKind.Unary,
+    },
+    /**
+     * ===== TEMPLATES (Optional Admin/Setup) =====
+     *
+     * @generated from rpc api.survey.v1.SurveyService.GetSurveyTemplate
+     */
+    getSurveyTemplate: {
+      name: "GetSurveyTemplate",
+      I: GetSurveyTemplateRequest,
+      O: SurveyTemplate,
       kind: MethodKind.Unary,
     },
     /**

@@ -1,8 +1,34 @@
 import { useState, useEffect, useCallback } from 'react';
 import { SurveyRepositoryImpl } from '../../data/repositories/SurveyRepositoryImpl';
-import { ApplicationSurvey } from '../../gen/survey/v1/survey_pb';
+import { ApplicationSurvey, SurveyTemplate } from '../../gen/survey/v1/survey_pb';
 
 const surveyRepo = new SurveyRepositoryImpl();
+
+export function useSurveyTemplate(id: string) {
+    const [template, setTemplate] = useState<SurveyTemplate | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<Error | null>(null);
+
+    const fetchTemplate = useCallback(async () => {
+        if (!id) return;
+        try {
+            setLoading(true);
+            setError(null);
+            const data = await surveyRepo.getSurveyTemplate(id);
+            setTemplate(data);
+        } catch (err) {
+            setError(err instanceof Error ? err : new Error('Failed to fetch survey template'));
+        } finally {
+            setLoading(false);
+        }
+    }, [id]);
+
+    useEffect(() => {
+        fetchTemplate();
+    }, [fetchTemplate]);
+
+    return { template, loading, error, refetch: fetchTemplate };
+}
 
 export function useMySurveys(assignedTo?: string, status?: string) {
     const [surveys, setSurveys] = useState<ApplicationSurvey[]>([]);

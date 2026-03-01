@@ -40,6 +40,11 @@ export class SurveyTemplate extends Message<SurveyTemplate> {
    */
   active = false;
 
+  /**
+   * @generated from field: repeated api.survey.v1.SurveySection sections = 7;
+   */
+  sections: SurveySection[] = [];
+
   constructor(data?: PartialMessage<SurveyTemplate>) {
     super();
     proto3.util.initPartial(data, this);
@@ -54,6 +59,7 @@ export class SurveyTemplate extends Message<SurveyTemplate> {
     { no: 4, name: "applicant_type", kind: "scalar", T: 9 /* ScalarType.STRING */ },
     { no: 5, name: "product_id", kind: "scalar", T: 9 /* ScalarType.STRING */ },
     { no: 6, name: "active", kind: "scalar", T: 8 /* ScalarType.BOOL */ },
+    { no: 7, name: "sections", kind: "message", T: SurveySection, repeated: true },
   ]);
 
   static fromBinary(bytes: Uint8Array, options?: Partial<BinaryReadOptions>): SurveyTemplate {
@@ -70,6 +76,197 @@ export class SurveyTemplate extends Message<SurveyTemplate> {
 
   static equals(a: SurveyTemplate | PlainMessage<SurveyTemplate> | undefined, b: SurveyTemplate | PlainMessage<SurveyTemplate> | undefined): boolean {
     return proto3.util.equals(SurveyTemplate, a, b);
+  }
+}
+
+/**
+ * @generated from message api.survey.v1.SurveySection
+ */
+export class SurveySection extends Message<SurveySection> {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id = "";
+
+  /**
+   * @generated from field: string template_id = 2;
+   */
+  templateId = "";
+
+  /**
+   * @generated from field: string section_name = 3;
+   */
+  sectionName = "";
+
+  /**
+   * @generated from field: int32 sequence = 4;
+   */
+  sequence = 0;
+
+  /**
+   * @generated from field: repeated api.survey.v1.SurveyQuestion questions = 5;
+   */
+  questions: SurveyQuestion[] = [];
+
+  constructor(data?: PartialMessage<SurveySection>) {
+    super();
+    proto3.util.initPartial(data, this);
+  }
+
+  static readonly runtime: typeof proto3 = proto3;
+  static readonly typeName = "api.survey.v1.SurveySection";
+  static readonly fields: FieldList = proto3.util.newFieldList(() => [
+    { no: 1, name: "id", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+    { no: 2, name: "template_id", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+    { no: 3, name: "section_name", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+    { no: 4, name: "sequence", kind: "scalar", T: 5 /* ScalarType.INT32 */ },
+    { no: 5, name: "questions", kind: "message", T: SurveyQuestion, repeated: true },
+  ]);
+
+  static fromBinary(bytes: Uint8Array, options?: Partial<BinaryReadOptions>): SurveySection {
+    return new SurveySection().fromBinary(bytes, options);
+  }
+
+  static fromJson(jsonValue: JsonValue, options?: Partial<JsonReadOptions>): SurveySection {
+    return new SurveySection().fromJson(jsonValue, options);
+  }
+
+  static fromJsonString(jsonString: string, options?: Partial<JsonReadOptions>): SurveySection {
+    return new SurveySection().fromJsonString(jsonString, options);
+  }
+
+  static equals(a: SurveySection | PlainMessage<SurveySection> | undefined, b: SurveySection | PlainMessage<SurveySection> | undefined): boolean {
+    return proto3.util.equals(SurveySection, a, b);
+  }
+}
+
+/**
+ * @generated from message api.survey.v1.SurveyQuestion
+ */
+export class SurveyQuestion extends Message<SurveyQuestion> {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id = "";
+
+  /**
+   * @generated from field: string section_id = 2;
+   */
+  sectionId = "";
+
+  /**
+   * @generated from field: string question_text = 3;
+   */
+  questionText = "";
+
+  /**
+   * TEXT | NUMBER | BOOLEAN | DATE | OPTION
+   *
+   * @generated from field: string answer_type = 4;
+   */
+  answerType = "";
+
+  /**
+   * @generated from field: int32 sequence = 5;
+   */
+  sequence = 0;
+
+  /**
+   * @generated from field: bool is_required = 6;
+   */
+  isRequired = false;
+
+  /**
+   * @generated from field: repeated api.survey.v1.SurveyQuestionOption options = 7;
+   */
+  options: SurveyQuestionOption[] = [];
+
+  constructor(data?: PartialMessage<SurveyQuestion>) {
+    super();
+    proto3.util.initPartial(data, this);
+  }
+
+  static readonly runtime: typeof proto3 = proto3;
+  static readonly typeName = "api.survey.v1.SurveyQuestion";
+  static readonly fields: FieldList = proto3.util.newFieldList(() => [
+    { no: 1, name: "id", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+    { no: 2, name: "section_id", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+    { no: 3, name: "question_text", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+    { no: 4, name: "answer_type", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+    { no: 5, name: "sequence", kind: "scalar", T: 5 /* ScalarType.INT32 */ },
+    { no: 6, name: "is_required", kind: "scalar", T: 8 /* ScalarType.BOOL */ },
+    { no: 7, name: "options", kind: "message", T: SurveyQuestionOption, repeated: true },
+  ]);
+
+  static fromBinary(bytes: Uint8Array, options?: Partial<BinaryReadOptions>): SurveyQuestion {
+    return new SurveyQuestion().fromBinary(bytes, options);
+  }
+
+  static fromJson(jsonValue: JsonValue, options?: Partial<JsonReadOptions>): SurveyQuestion {
+    return new SurveyQuestion().fromJson(jsonValue, options);
+  }
+
+  static fromJsonString(jsonString: string, options?: Partial<JsonReadOptions>): SurveyQuestion {
+    return new SurveyQuestion().fromJsonString(jsonString, options);
+  }
+
+  static equals(a: SurveyQuestion | PlainMessage<SurveyQuestion> | undefined, b: SurveyQuestion | PlainMessage<SurveyQuestion> | undefined): boolean {
+    return proto3.util.equals(SurveyQuestion, a, b);
+  }
+}
+
+/**
+ * @generated from message api.survey.v1.SurveyQuestionOption
+ */
+export class SurveyQuestionOption extends Message<SurveyQuestionOption> {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id = "";
+
+  /**
+   * @generated from field: string question_id = 2;
+   */
+  questionId = "";
+
+  /**
+   * @generated from field: string option_text = 3;
+   */
+  optionText = "";
+
+  /**
+   * @generated from field: string option_value = 4;
+   */
+  optionValue = "";
+
+  constructor(data?: PartialMessage<SurveyQuestionOption>) {
+    super();
+    proto3.util.initPartial(data, this);
+  }
+
+  static readonly runtime: typeof proto3 = proto3;
+  static readonly typeName = "api.survey.v1.SurveyQuestionOption";
+  static readonly fields: FieldList = proto3.util.newFieldList(() => [
+    { no: 1, name: "id", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+    { no: 2, name: "question_id", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+    { no: 3, name: "option_text", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+    { no: 4, name: "option_value", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+  ]);
+
+  static fromBinary(bytes: Uint8Array, options?: Partial<BinaryReadOptions>): SurveyQuestionOption {
+    return new SurveyQuestionOption().fromBinary(bytes, options);
+  }
+
+  static fromJson(jsonValue: JsonValue, options?: Partial<JsonReadOptions>): SurveyQuestionOption {
+    return new SurveyQuestionOption().fromJson(jsonValue, options);
+  }
+
+  static fromJsonString(jsonString: string, options?: Partial<JsonReadOptions>): SurveyQuestionOption {
+    return new SurveyQuestionOption().fromJsonString(jsonString, options);
+  }
+
+  static equals(a: SurveyQuestionOption | PlainMessage<SurveyQuestionOption> | undefined, b: SurveyQuestionOption | PlainMessage<SurveyQuestionOption> | undefined): boolean {
+    return proto3.util.equals(SurveyQuestionOption, a, b);
   }
 }
 
@@ -868,6 +1065,43 @@ export class GetSurveyRequest extends Message<GetSurveyRequest> {
 
   static equals(a: GetSurveyRequest | PlainMessage<GetSurveyRequest> | undefined, b: GetSurveyRequest | PlainMessage<GetSurveyRequest> | undefined): boolean {
     return proto3.util.equals(GetSurveyRequest, a, b);
+  }
+}
+
+/**
+ * @generated from message api.survey.v1.GetSurveyTemplateRequest
+ */
+export class GetSurveyTemplateRequest extends Message<GetSurveyTemplateRequest> {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id = "";
+
+  constructor(data?: PartialMessage<GetSurveyTemplateRequest>) {
+    super();
+    proto3.util.initPartial(data, this);
+  }
+
+  static readonly runtime: typeof proto3 = proto3;
+  static readonly typeName = "api.survey.v1.GetSurveyTemplateRequest";
+  static readonly fields: FieldList = proto3.util.newFieldList(() => [
+    { no: 1, name: "id", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+  ]);
+
+  static fromBinary(bytes: Uint8Array, options?: Partial<BinaryReadOptions>): GetSurveyTemplateRequest {
+    return new GetSurveyTemplateRequest().fromBinary(bytes, options);
+  }
+
+  static fromJson(jsonValue: JsonValue, options?: Partial<JsonReadOptions>): GetSurveyTemplateRequest {
+    return new GetSurveyTemplateRequest().fromJson(jsonValue, options);
+  }
+
+  static fromJsonString(jsonString: string, options?: Partial<JsonReadOptions>): GetSurveyTemplateRequest {
+    return new GetSurveyTemplateRequest().fromJsonString(jsonString, options);
+  }
+
+  static equals(a: GetSurveyTemplateRequest | PlainMessage<GetSurveyTemplateRequest> | undefined, b: GetSurveyTemplateRequest | PlainMessage<GetSurveyTemplateRequest> | undefined): boolean {
+    return proto3.util.equals(GetSurveyTemplateRequest, a, b);
   }
 }
 

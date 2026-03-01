@@ -10,7 +10,14 @@ console.log(`[gRPC] Transport initialized with baseUrl: ${baseUrl} (using gRPC-W
 // Switching to gRPC-Web because the backend uses improbable-eng/grpc-web middleware
 export const transport = createGrpcWebTransport({
     baseUrl,
-    useBinaryFormat: false, // Use JSON encoding for better compatibility with React Native fetch
+    useBinaryFormat: true, // Standard gRPC-Web uses binary format
+    interceptors: [
+        // Optional: Adding headers that can help the backend identify gRPC-Web requests
+        (next) => async (req) => {
+            req.header.set('X-Grpc-Web', '1');
+            return await next(req);
+        },
+    ],
 });
 
 

@@ -2,6 +2,7 @@ import { createGrpcClient } from '../network/grpcClient';
 import { SurveyService } from '../../gen/survey/v1/survey_connect';
 import {
     GetSurveyRequest,
+    GetSurveyTemplateRequest,
     ListSurveysRequest,
     ListSurveysByApplicationRequest,
     AssignSurveyRequest,
@@ -9,6 +10,7 @@ import {
     SubmitSurveyRequest,
     VerifySurveyRequest,
     ApplicationSurvey,
+    SurveyTemplate,
     ListSurveysResponse
 } from '../../gen/survey/v1/survey_pb';
 
@@ -25,6 +27,20 @@ export class SurveyRepositoryImpl {
             const res = await fetch(`${this.baseUrl}/v1/surveys/${id}`);
             if (res.ok) {
                 return ApplicationSurvey.fromJson(await res.json());
+            }
+            throw error;
+        }
+    }
+
+    async getSurveyTemplate(id: string): Promise<SurveyTemplate> {
+        try {
+            const response = await this.client.getSurveyTemplate(new GetSurveyTemplateRequest({ id }));
+            return response;
+        } catch (error) {
+            console.warn('[gRPC] Falling back to REST for GET Survey Template');
+            const res = await fetch(`${this.baseUrl}/v1/survey-templates/${id}`);
+            if (res.ok) {
+                return SurveyTemplate.fromJson(await res.json());
             }
             throw error;
         }
