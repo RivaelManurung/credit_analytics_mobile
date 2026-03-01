@@ -31,12 +31,17 @@ export function DashboardScreen({ onStartSurvey }: DashboardScreenProps) {
     }, [applications]);
 
     const stats = useMemo(() => {
+        const getStatusCount = (statusName: string) =>
+            applications.filter(a => a.status?.toUpperCase().includes(statusName.toUpperCase())).length;
+
         return {
             total: applications.length,
-            active: surveys.filter(s => s.status === 'IN_PROGRESS').length,
-            completed: surveys.filter(s => s.status === 'SUBMITTED' || s.status === 'VERIFIED').length
+            survey: getStatusCount('SURVEY'),
+            intake: getStatusCount('INTAKE'),
+            rejected: getStatusCount('REJECTED'),
+            committee: getStatusCount('COMMITTE'),
         };
-    }, [applications, surveys]);
+    }, [applications]);
 
     const refetch = () => {
         refetchApps();
@@ -85,20 +90,39 @@ export function DashboardScreen({ onStartSurvey }: DashboardScreenProps) {
                     </View>
                 )}
 
-                <View className="flex-row flex-wrap justify-between">
-                    <View style={{ width: '48%' }}>
-                        <StatCard
-                            title="Total Nasabah"
-                            value={stats.total}
-                            icon={<User color="#0b78ed" size={20} />}
-                        />
-                    </View>
-                    <View style={{ width: '48%' }}>
-                        <StatCard
-                            title="Survey Aktif"
-                            value={stats.active}
-                            icon={<Clock color="#e6a419" size={20} />}
-                        />
+                <View className="mb-6">
+                    <StatCard
+                        title="Total Assignment"
+                        value={stats.total}
+                        icon={<User color="#0b78ed" size={24} />}
+                    />
+                    <View className="flex-row flex-wrap justify-between gap-y-3">
+                        <View style={{ width: '48%' }}>
+                            <View className="bg-white rounded-xl p-3 items-center shadow-sm border-b-4 border-amber-500">
+                                <View className="flex-row items-center mb-1">
+                                    <Text className="text-secondary text-[10px] font-bold">SURVEY</Text>
+                                </View>
+                                <Text className="text-amber-600 text-2xl font-bold">{stats.survey}</Text>
+                            </View>
+                        </View>
+                        <View style={{ width: '48%' }}>
+                            <View className="bg-white rounded-xl p-3 items-center shadow-sm border-b-4 border-blue-500">
+                                <Text className="text-secondary text-[10px] font-bold mb-1">INTAKE</Text>
+                                <Text className="text-blue-600 text-2xl font-bold">{stats.intake}</Text>
+                            </View>
+                        </View>
+                        <View style={{ width: '48%' }}>
+                            <View className="bg-white rounded-xl p-3 items-center shadow-sm border-b-4 border-purple-500">
+                                <Text className="text-secondary text-[10px] font-bold mb-1">COMMITTEE</Text>
+                                <Text className="text-purple-600 text-2xl font-bold">{stats.committee}</Text>
+                            </View>
+                        </View>
+                        <View style={{ width: '48%' }}>
+                            <View className="bg-white rounded-xl p-3 items-center shadow-sm border-b-4 border-red-500">
+                                <Text className="text-secondary text-[10px] font-bold mb-1">REJECTED</Text>
+                                <Text className="text-red-600 text-2xl font-bold">{stats.rejected}</Text>
+                            </View>
+                        </View>
                     </View>
                 </View>
 

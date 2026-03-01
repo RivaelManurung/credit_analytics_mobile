@@ -7,6 +7,7 @@ import {
     AssignSurveyRequest,
     StartSurveyRequest,
     SubmitSurveyRequest,
+    SubmitSurveyAnswerRequest,
     VerifySurveyRequest,
     ApplicationSurvey,
     ListSurveysResponse
@@ -80,10 +81,10 @@ export class SurveyRepositoryImpl {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    templateId,
-                    surveyType,
-                    assignedTo,
-                    surveyPurpose
+                    template_id: templateId,
+                    survey_type: surveyType,
+                    assigned_to: assignedTo,
+                    survey_purpose: surveyPurpose
                 })
             });
             if (res.ok) {
@@ -122,6 +123,33 @@ export class SurveyRepositoryImpl {
             });
             if (res.ok) return ApplicationSurvey.fromJson(await res.json());
             throw error;
+        }
+    }
+
+    async submitSurveyAnswer(surveyId: string, questionId: string, answer: { text?: string, number?: string, boolean?: boolean, date?: string }): Promise<void> {
+        try {
+            await this.client.submitSurveyAnswer(new SubmitSurveyAnswerRequest({
+                surveyId,
+                questionId,
+                answerText: answer.text,
+                answerNumber: answer.number,
+                answerBoolean: answer.boolean,
+                answerDate: answer.date
+            }));
+        } catch (error) {
+            console.warn('[gRPC ERROR] Falling back to REST for SUBMIT Answer');
+            const res = await fetch(`${this.baseUrl}/v1/surveys/${surveyId}/answers`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    question_id: questionId,
+                    answer_text: answer.text,
+                    answer_number: answer.number,
+                    answer_boolean: answer.boolean,
+                    answer_date: answer.date
+                })
+            });
+            if (!res.ok) throw error;
         }
     }
 

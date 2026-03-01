@@ -100,7 +100,19 @@ export function useSurveyControl() {
         }
     };
 
-    return { startSurvey, submitSurvey, assignSurvey, loading, error };
+    const submitSurveyAnswer = async (surveyId: string, questionId: string, answer: { text?: string, number?: string, boolean?: boolean, date?: string }): Promise<void> => {
+        try {
+            setLoading(true);
+            setError(null);
+            await surveyRepo.submitSurveyAnswer(surveyId, questionId, answer);
+        } catch (err) {
+            setError(err instanceof Error ? err : new Error('Failed to submit survey answer'));
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return { startSurvey, submitSurvey, assignSurvey, submitSurveyAnswer, loading, error };
 }
 export function useSurvey(id: string) {
     const [survey, setSurvey] = useState<ApplicationSurvey | null>(null);

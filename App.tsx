@@ -13,6 +13,7 @@ import {
 } from 'react-native-safe-area-context';
 import { DashboardScreen } from './src/presentation/screens/DashboardScreen';
 import { SurveyFormScreen } from './src/presentation/screens/SurveyFormScreen';
+import { SurveyCategoryScreen } from './src/presentation/screens/SurveyCategoryScreen';
 import { LoginScreen } from './src/presentation/screens/LoginScreen';
 import { AuthProvider, useAuth } from './src/presentation/context/AuthContext';
 
@@ -31,17 +32,29 @@ function App() {
 
 function AppContent() {
   const { surveyorId } = useAuth();
-  const [currentScreen, setCurrentScreen] = useState<'dashboard' | 'survey'>('dashboard');
+  const [currentScreen, setCurrentScreen] = useState<'dashboard' | 'categories' | 'survey'>('dashboard');
   const [activeSurveyId, setActiveSurveyId] = useState<string | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
-  const navigateToSurvey = (surveyId: string) => {
+  const navigateToCategorySelection = (surveyId: string) => {
     setActiveSurveyId(surveyId);
+    setCurrentScreen('categories');
+  };
+
+  const navigateToSurvey = (categoryCode: string) => {
+    setSelectedCategory(categoryCode);
     setCurrentScreen('survey');
   };
 
-  const navigateBack = () => {
+  const navigateBackToDashboard = () => {
     setCurrentScreen('dashboard');
     setActiveSurveyId(null);
+    setSelectedCategory(null);
+  };
+
+  const navigateBackFromSurvey = () => {
+    setCurrentScreen('categories');
+    setSelectedCategory(null);
   };
 
   if (!surveyorId) {
@@ -51,9 +64,19 @@ function AppContent() {
   return (
     <View style={styles.container}>
       {currentScreen === 'dashboard' ? (
-        <DashboardScreen onStartSurvey={navigateToSurvey} />
+        <DashboardScreen onStartSurvey={navigateToCategorySelection} />
+      ) : currentScreen === 'categories' ? (
+        <SurveyCategoryScreen
+          surveyId={activeSurveyId!}
+          onBack={navigateBackToDashboard}
+          onSelectCategory={navigateToSurvey}
+        />
       ) : (
-        <SurveyFormScreen surveyId={activeSurveyId!} onBack={navigateBack} />
+        <SurveyFormScreen
+          surveyId={activeSurveyId!}
+          categoryCode={selectedCategory!}
+          onBack={navigateBackFromSurvey}
+        />
       )}
     </View>
   );
