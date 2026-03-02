@@ -5,14 +5,21 @@ import {
     GetSurveyTemplateRequest,
     ListSurveysRequest,
     ListSurveysByApplicationRequest,
+    ListSurveyTemplatesRequest,
     AssignSurveyRequest,
     StartSurveyRequest,
     SubmitSurveyRequest,
+    SubmitSurveyAnswerRequest,
     VerifySurveyRequest,
     ApplicationSurvey,
     SurveyTemplate,
-    ListSurveysResponse
+    ListSurveysResponse,
+    SurveySection,
+    SurveyQuestion,
+    SurveyQuestionOption
 } from '../../gen/survey/v1/survey_pb';
+import { Timestamp } from '@bufbuild/protobuf';
+import { scrubJson } from '../network/utils';
 
 export class SurveyRepositoryImpl {
     private client = createGrpcClient(SurveyService);
@@ -26,8 +33,11 @@ export class SurveyRepositoryImpl {
             console.warn('[gRPC] Falling back to REST for GET Survey');
             const res = await fetch(`${this.baseUrl}/v1/surveys/${id}`);
             if (res.ok) {
-                return ApplicationSurvey.fromJson(await res.json());
+                const data = await res.json();
+                console.log('[DEBUG] REST GET Survey Success');
+                return new ApplicationSurvey(scrubJson(data));
             }
+            console.error(`[REST ERROR] GET Survey failed: ${res.status}`);
             throw error;
         }
     }
@@ -40,7 +50,23 @@ export class SurveyRepositoryImpl {
             console.warn('[gRPC] Falling back to REST for GET Survey Template');
             const res = await fetch(`${this.baseUrl}/v1/survey-templates/${id}`);
             if (res.ok) {
-                return SurveyTemplate.fromJson(await res.json());
+                const data = await res.json();
+                return new SurveyTemplate(scrubJson(data));
+            }
+            throw error;
+        }
+    }
+
+    async listSurveyTemplates(): Promise<SurveyTemplate[]> {
+        try {
+            const response = await this.client.listSurveyTemplates(new ListSurveyTemplatesRequest({}));
+            return response.templates;
+        } catch (error) {
+            console.warn('[gRPC ERROR] Falling back to REST for LIST Templates');
+            const res = await fetch(`${this.baseUrl}/v1/survey-templates`);
+            if (res.ok) {
+                const data = await res.json();
+                return (data.templates || []).map((t: any) => new SurveyTemplate(scrubJson(t)));
             }
             throw error;
         }
@@ -61,8 +87,10 @@ export class SurveyRepositoryImpl {
             const res = await fetch(url);
             if (res.ok) {
                 const data = await res.json();
-                return (data.surveys || []).map((s: any) => ApplicationSurvey.fromJson(s));
+                console.log('[DEBUG] REST LIST Surveys Success');
+                return (data.surveys || []).map((s: any) => new ApplicationSurvey(scrubJson(s)));
             }
+            console.error(`[REST ERROR] LIST Surveys failed: ${res.status}`);
             throw error;
         }
     }
@@ -75,7 +103,8 @@ export class SurveyRepositoryImpl {
             const res = await fetch(`${this.baseUrl}/v1/applications/${applicationId}/surveys`);
             if (res.ok) {
                 const data = await res.json();
-                return (data.surveys || []).map((s: any) => ApplicationSurvey.fromJson(s));
+                console.log('[DEBUG] REST LIST Surveys by App Success');
+                return (data.surveys || []).map((s: any) => new ApplicationSurvey(scrubJson(s)));
             }
             throw error;
         }
@@ -83,28 +112,40 @@ export class SurveyRepositoryImpl {
 
     async assignSurvey(applicationId: string, templateId: string, surveyType: string, assignedTo: string, surveyPurpose: string): Promise<ApplicationSurvey> {
         try {
-            return await this.client.assignSurvey(new AssignSurveyRequest({
-                applicationId,
-                templateId,
-                surveyType,
-                assignedTo,
-                surveyPurpose
-            }));
-        } catch (error) {
-            console.warn('[gRPC ERROR] Falling back to REST for ASSIGN Survey');
-            const res = await fetch(`${this.baseUrl}/v1/applications/${applicationId}/surveys`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
+            // First try gRPC
+            try {
+                return await this.client.assignSurvey(new AssignSurveyRequest({
+                    applicationId,
                     templateId,
                     surveyType,
                     assignedTo,
                     surveyPurpose
+                }));
+            } catch (grpcErr: any) {
+                console.warn('[gRPC ERROR] Assign Survey failed, trying REST:', grpcErr.message || grpcErr);
+                throw grpcErr; // Re-throw to hit the main catch block
+            }
+        } catch (error) {
+            const res = await fetch(`${this.baseUrl}/v1/applications/${applicationId}/surveys`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    template_id: templateId,
+                    survey_type: surveyType,
+                    assigned_to: assignedTo,
+                    survey_purpose: surveyPurpose
                 })
             });
             if (res.ok) {
-                return ApplicationSurvey.fromJson(await res.json());
+                const data = await res.json();
+                console.log('[DEBUG] REST ASSIGN Survey raw JSON:', JSON.stringify(data));
+                const scrubbed = scrubJson(data);
+                const mapped = new ApplicationSurvey(scrubbed);
+                console.log('[DEBUG] Mapped ApplicationSurvey ID:', mapped.id);
+                return mapped;
             }
+            const errorText = await res.text();
+            console.error(`[REST ERROR] ASSIGN Survey failed: ${res.status} ${errorText}`);
             throw error;
         }
     }
@@ -120,7 +161,11 @@ export class SurveyRepositoryImpl {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ user_id: userId })
             });
-            if (res.ok) return ApplicationSurvey.fromJson(await res.json());
+            if (res.ok) {
+                const data = await res.json();
+                console.log('[DEBUG] REST START Survey Success');
+                return new ApplicationSurvey(scrubJson(data));
+            }
             throw error;
         }
     }
@@ -136,8 +181,39 @@ export class SurveyRepositoryImpl {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ user_id: userId })
             });
-            if (res.ok) return ApplicationSurvey.fromJson(await res.json());
+            if (res.ok) {
+                const data = await res.json();
+                console.log('[DEBUG] REST SUBMIT Survey Success');
+                return new ApplicationSurvey(scrubJson(data));
+            }
             throw error;
+        }
+    }
+
+    async submitSurveyAnswer(surveyId: string, questionId: string, answer: { text?: string, number?: string, boolean?: boolean, date?: string }): Promise<void> {
+        try {
+            await this.client.submitSurveyAnswer(new SubmitSurveyAnswerRequest({
+                surveyId,
+                questionId,
+                answerText: answer.text,
+                answerNumber: answer.number,
+                answerBoolean: answer.boolean,
+                answerDate: answer.date
+            }));
+        } catch (error) {
+            console.warn('[gRPC ERROR] Falling back to REST for SUBMIT Answer');
+            const res = await fetch(`${this.baseUrl}/v1/surveys/${surveyId}/answers`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    question_id: questionId,
+                    answer_text: answer.text,
+                    answer_number: answer.number,
+                    answer_boolean: answer.boolean,
+                    answer_date: answer.date
+                })
+            });
+            if (!res.ok) throw error;
         }
     }
 

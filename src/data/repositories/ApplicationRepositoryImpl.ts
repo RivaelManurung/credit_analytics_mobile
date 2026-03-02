@@ -1,6 +1,7 @@
 import { createGrpcClient } from '../network/grpcClient';
 import { ApplicationService } from '../../gen/application/v1/application_connect';
 import { ListApplicationsRequest, Application } from '../../gen/application/v1/application_pb';
+import { scrubJson } from '../network/utils';
 
 export class ApplicationRepositoryImpl {
     private client = createGrpcClient(ApplicationService);
@@ -26,9 +27,10 @@ export class ApplicationRepositoryImpl {
                 if (res.ok) {
                     const data = await res.json();
                     console.log('[DEBUG] REST Applications Success');
-                    // Map REST JSON to Proto objects
-                    return (data.applications || []).map((app: any) => Application.fromJson(app));
+                    // Map REST JSON to Proto objects using constructor for more resilience
+                    return (data.applications || []).map((app: any) => new Application(scrubJson(app)));
                 }
+                console.error(`[REST ERROR] LIST Applications failed: ${res.status}`);
                 throw grpcErr;
             }
         } catch (error) {
@@ -60,7 +62,7 @@ export class ApplicationRepositoryImpl {
                 })
             });
             if (res.ok) {
-                return Application.fromJson(await res.json());
+                return new Application(scrubJson(await res.json()));
             }
             throw grpcErr;
         }

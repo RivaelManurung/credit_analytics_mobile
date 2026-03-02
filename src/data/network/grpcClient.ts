@@ -10,11 +10,15 @@ console.log(`[gRPC] Transport initialized with baseUrl: ${baseUrl} (using gRPC-W
 // Switching to gRPC-Web because the backend uses improbable-eng/grpc-web middleware
 export const transport = createGrpcWebTransport({
     baseUrl,
-    useBinaryFormat: true, // Standard gRPC-Web uses binary format
+    useBinaryFormat: false, // Text format is more robust for some proxies
     interceptors: [
-        // Optional: Adding headers that can help the backend identify gRPC-Web requests
         (next) => async (req) => {
             req.header.set('X-Grpc-Web', '1');
+            req.header.set('X-User-Agent', 'grpc-web-javascript/0.1');
+            // Adding Content-Type explicitly to help some middleboxes
+            if (!req.header.has('Content-Type')) {
+                req.header.set('Content-Type', 'application/grpc-web-text+proto');
+            }
             return await next(req);
         },
     ],
