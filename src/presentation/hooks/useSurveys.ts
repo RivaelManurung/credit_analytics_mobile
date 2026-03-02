@@ -30,6 +30,31 @@ export function useSurveyTemplate(id: string) {
     return { template, loading, error, refetch: fetchTemplate };
 }
 
+export function useSurveyTemplates() {
+    const [templates, setTemplates] = useState<SurveyTemplate[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<Error | null>(null);
+
+    const fetchTemplates = useCallback(async () => {
+        try {
+            setLoading(true);
+            setError(null);
+            const data = await surveyRepo.listSurveyTemplates();
+            setTemplates(data);
+        } catch (err) {
+            setError(err instanceof Error ? err : new Error('Failed to fetch survey templates'));
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        fetchTemplates();
+    }, [fetchTemplates]);
+
+    return { templates, loading, error, refetch: fetchTemplates };
+}
+
 export function useMySurveys(assignedTo?: string, status?: string) {
     const [surveys, setSurveys] = useState<ApplicationSurvey[]>([]);
     const [loading, setLoading] = useState(true);
@@ -118,7 +143,8 @@ export function useSurveyControl() {
             setError(null);
             const survey = await surveyRepo.assignSurvey(applicationId, templateId, surveyType, assignedTo, surveyPurpose);
             return survey;
-        } catch (err) {
+        } catch (err: any) {
+            console.error('[useSurveyControl] Assign Survey Error:', err.message || err);
             setError(err instanceof Error ? err : new Error('Failed to assign survey'));
             return null;
         } finally {
@@ -126,7 +152,19 @@ export function useSurveyControl() {
         }
     };
 
-    return { startSurvey, submitSurvey, assignSurvey, loading, error };
+    const submitSurveyAnswer = async (surveyId: string, questionId: string, answer: { text?: string, number?: string, boolean?: boolean, date?: string }): Promise<void> => {
+        try {
+            setLoading(true);
+            setError(null);
+            await surveyRepo.submitSurveyAnswer(surveyId, questionId, answer);
+        } catch (err) {
+            setError(err instanceof Error ? err : new Error('Failed to submit survey answer'));
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return { startSurvey, submitSurvey, assignSurvey, submitSurveyAnswer, loading, error };
 }
 export function useSurvey(id: string) {
     const [survey, setSurvey] = useState<ApplicationSurvey | null>(null);

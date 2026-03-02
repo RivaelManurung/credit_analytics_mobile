@@ -13,6 +13,7 @@ import {
 } from 'react-native-safe-area-context';
 import { DashboardScreen } from './src/presentation/screens/DashboardScreen';
 import { SurveyFormScreen } from './src/presentation/screens/SurveyFormScreen';
+import { SurveyCategoryScreen } from './src/presentation/screens/SurveyCategoryScreen';
 import { LoginScreen } from './src/presentation/screens/LoginScreen';
 import { AuthProvider, useAuth } from './src/presentation/context/AuthContext';
 
@@ -39,7 +40,7 @@ function AppContent() {
     setCurrentScreen('survey');
   };
 
-  const navigateBack = () => {
+  const navigateBackToDashboard = () => {
     setCurrentScreen('dashboard');
     setActiveSurveyId(null);
   };
@@ -53,7 +54,10 @@ function AppContent() {
       {currentScreen === 'dashboard' ? (
         <DashboardScreen onStartSurvey={navigateToSurvey} />
       ) : (
-        <SurveyFormScreen surveyId={activeSurveyId!} onBack={navigateBack} />
+        <SurveyFormScreen
+          surveyId={activeSurveyId!}
+          onBack={navigateBackToDashboard}
+        />
       )}
     </View>
   );
