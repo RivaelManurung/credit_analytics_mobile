@@ -1,0 +1,2684 @@
+openapi: 3.0.3
+info:
+  title: Credit Analytics API
+  version: 1.0.0
+paths:
+  /v1/applicants:
+    get:
+      tags:
+      - ApplicantService
+      operationId: ApplicantService_ListApplicants
+      parameters:
+      - name: cursor
+        in: query
+        description: Cursor dari response sebelumnya (opaque token).
+        schema:
+          type: string
+      - name: pageSize
+        in: query
+        description: Jumlah data per halaman.
+        schema:
+          type: integer
+          format: int32
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.applicant.v1.ListApplicantsResponse'
+    post:
+      tags:
+      - ApplicantService
+      operationId: ApplicantService_CreateApplicant
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/api.applicant.v1.CreateApplicantRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.applicant.v1.Applicant'
+  /v1/applicants/{applicantId}/attributes:
+    get:
+      tags:
+      - ApplicantService
+      operationId: ApplicantService_GetApplicantAttributes
+      parameters:
+      - name: applicantId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.applicant.v1.ApplicantAttributes'
+    post:
+      tags:
+      - ApplicantService
+      operationId: ApplicantService_UpsertApplicantAttributes
+      parameters:
+      - name: applicantId
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/api.applicant.v1.UpsertApplicantAttributesRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.applicant.v1.ApplicantAttributes'
+  /v1/applicants/{id}:
+    get:
+      tags:
+      - ApplicantService
+      operationId: ApplicantService_GetApplicant
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.applicant.v1.Applicant'
+    put:
+      tags:
+      - ApplicantService
+      operationId: ApplicantService_UpdateApplicant
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/api.applicant.v1.UpdateApplicantRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.applicant.v1.Applicant'
+  /v1/applications:
+    get:
+      tags:
+      - ApplicationService
+      operationId: ApplicationService_ListApplications
+      parameters:
+      - name: cursor
+        in: query
+        description: Cursor dari response sebelumnya (opaque token). Jika kosong,
+          ambil halaman pertama.
+        schema:
+          type: string
+      - name: pageSize
+        in: query
+        description: Jumlah data per halaman. Default 10, Max 100.
+        schema:
+          type: integer
+          format: int32
+      - name: status
+        in: query
+        description: Filter status aplikasi
+        schema:
+          type: string
+      - name: applicantId
+        in: query
+        description: Filter berdasarkan ID Applicant
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.application.v1.ListApplicationsResponse'
+    post:
+      tags:
+      - ApplicationService
+      operationId: ApplicationService_CreateApplication
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/api.application.v1.CreateApplicationRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.application.v1.Application'
+  /v1/applications/documents/presigned-url:
+    get:
+      tags:
+      - ApplicationService
+      operationId: ApplicationService_GetPresignedUrl
+      parameters:
+      - name: fileName
+        in: query
+        schema:
+          type: string
+      - name: fileType
+        in: query
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.application.v1.GetPresignedUrlResponse'
+  /v1/applications/{applicationId}/attributes:
+    get:
+      tags:
+      - ApplicationService
+      operationId: ApplicationService_GetApplicationAttributes
+      parameters:
+      - name: applicationId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.application.v1.ApplicationAttributes'
+    post:
+      tags:
+      - ApplicationService
+      operationId: ApplicationService_UpsertApplicationAttributes
+      parameters:
+      - name: applicationId
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/api.application.v1.UpsertApplicationAttributesRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.application.v1.ApplicationAttributes'
+  /v1/applications/{applicationId}/documents:
+    get:
+      tags:
+      - ApplicationService
+      operationId: ApplicationService_ListApplicationDocuments
+      parameters:
+      - name: applicationId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.application.v1.ListApplicationDocumentsResponse'
+    post:
+      tags:
+      - ApplicationService
+      operationId: ApplicationService_UploadApplicationDocument
+      parameters:
+      - name: applicationId
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/api.application.v1.UploadApplicationDocumentRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.application.v1.ApplicationDocument'
+  /v1/applications/{applicationId}/parties:
+    get:
+      tags:
+      - PartyService
+      operationId: PartyService_ListApplicationParties
+      parameters:
+      - name: applicationId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.application.v1.ListApplicationPartiesResponse'
+    post:
+      tags:
+      - PartyService
+      operationId: PartyService_AddPartyToApplication
+      parameters:
+      - name: applicationId
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/api.application.v1.AddPartyToApplicationRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.application.v1.ApplicationParty'
+  /v1/applications/{applicationId}/parties/{partyId}:
+    delete:
+      tags:
+      - PartyService
+      operationId: PartyService_RemovePartyFromApplication
+      parameters:
+      - name: applicationId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: partyId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content: {}
+  /v1/applications/{id}:
+    get:
+      tags:
+      - ApplicationService
+      operationId: ApplicationService_GetApplication
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.application.v1.Application'
+    put:
+      tags:
+      - ApplicationService
+      operationId: ApplicationService_UpdateApplication
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/api.application.v1.UpdateApplicationRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.application.v1.Application'
+  /v1/applications/{id}/status:
+    put:
+      tags:
+      - ApplicationService
+      operationId: ApplicationService_ChangeApplicationStatus
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/api.application.v1.ChangeApplicationStatusRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.application.v1.Application'
+  /v1/applications/{applicationId}/committee-sessions:
+    get:
+      tags:
+      - CommitteeService
+      operationId: CommitteeService_ListCommitteeSessionsByApplication
+      parameters:
+      - name: applicationId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.decision.v1.ListCommitteeSessionsResponse'
+  /v1/applications/{applicationId}/decision:
+    get:
+      tags:
+      - DecisionService
+      operationId: DecisionService_GetApplicationDecision
+      parameters:
+      - name: applicationId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.decision.v1.ApplicationDecision'
+  /v1/applications/{applicationId}/decision-conditions:
+    get:
+      tags:
+      - DecisionService
+      operationId: DecisionService_ListDecisionConditions
+      parameters:
+      - name: applicationId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.decision.v1.ListDecisionConditionsResponse'
+    post:
+      tags:
+      - DecisionService
+      operationId: DecisionService_AddDecisionCondition
+      parameters:
+      - name: applicationId
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/api.decision.v1.AddDecisionConditionRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.decision.v1.DecisionCondition'
+  /v1/applications/{applicationId}/final-decision:
+    post:
+      tags:
+      - DecisionService
+      operationId: DecisionService_RecordFinalDecision
+      parameters:
+      - name: applicationId
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/api.decision.v1.RecordFinalDecisionRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.decision.v1.ApplicationDecision'
+  /v1/committee/sessions:
+    post:
+      tags:
+      - CommitteeService
+      operationId: CommitteeService_CreateCommitteeSession
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/api.decision.v1.CreateCommitteeSessionRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.decision.v1.CommitteeSession'
+  /v1/committee/sessions/{committeeSessionId}/finalize:
+    post:
+      tags:
+      - CommitteeService
+      operationId: CommitteeService_FinalizeCommitteeDecision
+      parameters:
+      - name: committeeSessionId
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/api.decision.v1.FinalizeCommitteeDecisionRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.decision.v1.CommitteeDecision'
+  /v1/committee/sessions/{committeeSessionId}/votes:
+    post:
+      tags:
+      - CommitteeService
+      operationId: CommitteeService_SubmitCommitteeVote
+      parameters:
+      - name: committeeSessionId
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/api.decision.v1.SubmitCommitteeVoteRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.decision.v1.CommitteeVote'
+  /v1/committee/sessions/{id}:
+    get:
+      tags:
+      - CommitteeService
+      operationId: CommitteeService_GetCommitteeSession
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.decision.v1.CommitteeSession'
+  /v1/applications/{applicationId}/assets:
+    get:
+      tags:
+      - FinancialService
+      operationId: FinancialService_ListAssetsByApplication
+      parameters:
+      - name: applicationId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.financial.v1.ListAssetsResponse'
+    post:
+      tags:
+      - FinancialService
+      operationId: FinancialService_AddAsset
+      parameters:
+      - name: applicationId
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/api.financial.v1.AddAssetRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.financial.v1.ApplicationAsset'
+  /v1/applications/{applicationId}/assets/{id}:
+    put:
+      tags:
+      - FinancialService
+      operationId: FinancialService_UpdateAsset
+      parameters:
+      - name: applicationId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/api.financial.v1.UpdateAssetRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.financial.v1.ApplicationAsset'
+  /v1/applications/{applicationId}/financial-facts:
+    get:
+      tags:
+      - FinancialService
+      operationId: FinancialService_ListFinancialFacts
+      parameters:
+      - name: applicationId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.financial.v1.ListFinancialFactsResponse'
+    post:
+      tags:
+      - FinancialService
+      operationId: FinancialService_UpsertFinancialFact
+      parameters:
+      - name: applicationId
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/api.financial.v1.UpsertFinancialFactRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.financial.v1.ApplicationFinancialFact'
+  /v1/applications/{applicationId}/financial-ratios/calculate:
+    post:
+      tags:
+      - FinancialService
+      operationId: FinancialService_CalculateFinancialRatios
+      parameters:
+      - name: applicationId
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/api.financial.v1.CalculateFinancialRatiosRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.financial.v1.ListFinancialRatiosResponse'
+  /v1/applications/{applicationId}/liabilities:
+    get:
+      tags:
+      - FinancialService
+      operationId: FinancialService_ListLiabilitiesByApplication
+      parameters:
+      - name: applicationId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.financial.v1.ListLiabilitiesResponse'
+    post:
+      tags:
+      - FinancialService
+      operationId: FinancialService_AddLiability
+      parameters:
+      - name: applicationId
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/api.financial.v1.AddLiabilityRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.financial.v1.ApplicationLiability'
+  /v1/applications/{applicationId}/liabilities/{id}:
+    put:
+      tags:
+      - FinancialService
+      operationId: FinancialService_UpdateLiability
+      parameters:
+      - name: applicationId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/api.financial.v1.UpdateLiabilityRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.financial.v1.ApplicationLiability'
+  /helloworld/{name}:
+    get:
+      tags:
+      - Greeter
+      description: Sends a greeting
+      operationId: Greeter_SayHello
+      parameters:
+      - name: name
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/helloworld.v1.HelloReply'
+  /v1/reference/application-statuses:
+    get:
+      tags:
+      - ReferenceService
+      description: '---- Application Statuses ----'
+      operationId: ReferenceService_ListApplicationStatuses
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.reference.v1.ListApplicationStatusesResponse'
+  /v1/reference/attribute-categories:
+    get:
+      tags:
+      - ReferenceService
+      description: "---- Attribute Categories (Dinamis \xE2\u20AC\u201D icon disimpan\
+        \ di sini) ----"
+      operationId: ReferenceService_ListAttributeCategories
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.reference.v1.ListAttributeCategoriesResponse'
+    post:
+      tags:
+      - ReferenceService
+      operationId: ReferenceService_CreateAttributeCategory
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/api.reference.v1.CreateAttributeCategoryRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.reference.v1.AttributeCategory'
+  /v1/reference/attribute-categories/{categoryCode}:
+    get:
+      tags:
+      - ReferenceService
+      operationId: ReferenceService_GetAttributeCategory
+      parameters:
+      - name: categoryCode
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.reference.v1.AttributeCategory'
+    put:
+      tags:
+      - ReferenceService
+      operationId: ReferenceService_UpdateAttributeCategory
+      parameters:
+      - name: categoryCode
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/api.reference.v1.UpdateAttributeCategoryRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.reference.v1.AttributeCategory'
+    delete:
+      tags:
+      - ReferenceService
+      operationId: ReferenceService_DeleteAttributeCategory
+      parameters:
+      - name: categoryCode
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content: {}
+  /v1/reference/attribute-registry:
+    get:
+      tags:
+      - ReferenceService
+      description: "---- Attribute Registry (icon TIDAK di sini \xE2\u20AC\u201D diambil\
+        \ dari category) ----"
+      operationId: ReferenceService_ListAttributeRegistry
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.reference.v1.ListAttributeRegistryResponse'
+    post:
+      tags:
+      - ReferenceService
+      operationId: ReferenceService_CreateAttributeRegistry
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/api.reference.v1.CreateAttributeRegistryRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content: {}
+  /v1/reference/attribute-registry/by-category/{categoryCode}:
+    get:
+      tags:
+      - ReferenceService
+      operationId: ReferenceService_ListAttributeRegistryByCategory
+      parameters:
+      - name: categoryCode
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.reference.v1.ListAttributeRegistryResponse'
+  /v1/reference/attribute-registry/{attributeCode}:
+    put:
+      tags:
+      - ReferenceService
+      operationId: ReferenceService_UpdateAttributeRegistry
+      parameters:
+      - name: attributeCode
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/api.reference.v1.UpdateAttributeRegistryRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content: {}
+  /v1/reference/attribute-registry/{id}:
+    delete:
+      tags:
+      - ReferenceService
+      operationId: ReferenceService_DeleteAttributeRegistry
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content: {}
+  /v1/reference/branches:
+    get:
+      tags:
+      - ReferenceService
+      description: '---- Branches & Officers ----'
+      operationId: ReferenceService_ListBranches
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.reference.v1.ListBranchesResponse'
+  /v1/reference/branches/{branchCode}/officers:
+    get:
+      tags:
+      - ReferenceService
+      operationId: ReferenceService_ListLoanOfficers
+      parameters:
+      - name: branchCode
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.reference.v1.ListLoanOfficersResponse'
+  /v1/reference/gl-accounts:
+    get:
+      tags:
+      - ReferenceService
+      description: '---- Financial GL Accounts ----'
+      operationId: ReferenceService_ListFinancialGLAccounts
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.reference.v1.ListFinancialGLAccountsResponse'
+  /v1/reference/loan-products:
+    get:
+      tags:
+      - ReferenceService
+      description: '---- Loan Products ----'
+      operationId: ReferenceService_ListLoanProducts
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.reference.v1.ListLoanProductsResponse'
+  /v1/reference/loan-products/{id}:
+    get:
+      tags:
+      - ReferenceService
+      operationId: ReferenceService_GetLoanProduct
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.reference.v1.LoanProduct'
+  /v1/reference/survey-templates:
+    get:
+      tags:
+      - ReferenceService
+      description: '---- Survey Templates ----'
+      operationId: ReferenceService_ListSurveyTemplates
+      parameters:
+      - name: applicantType
+        in: query
+        schema:
+          type: string
+      - name: productId
+        in: query
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.reference.v1.ListSurveyTemplatesResponse'
+  /v1/applications/{applicationId}/surveys:
+    get:
+      tags:
+      - SurveyService
+      description: ===== LIST BY APPLICATION =====
+      operationId: SurveyService_ListSurveysByApplication
+      parameters:
+      - name: applicationId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.survey.v1.ListSurveysByApplicationResponse'
+    post:
+      tags:
+      - SurveyService
+      description: ===== ASSIGN & GET =====
+      operationId: SurveyService_AssignSurvey
+      parameters:
+      - name: applicationId
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/api.survey.v1.AssignSurveyRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.survey.v1.ApplicationSurvey'
+  /v1/sections/{sectionId}/questions:
+    get:
+      tags:
+      - SurveyService
+      operationId: SurveyService_ListSurveyQuestions
+      parameters:
+      - name: sectionId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.survey.v1.ListSurveyQuestionsResponse'
+  /v1/survey-templates:
+    get:
+      tags:
+      - SurveyService
+      description: ===== TEMPLATES (Optional Admin/Setup) =====
+      operationId: SurveyService_ListSurveyTemplates
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.survey.v1.ListSurveyTemplatesResponse'
+    post:
+      tags:
+      - SurveyService
+      operationId: SurveyService_CreateSurveyTemplate
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/api.survey.v1.CreateSurveyTemplateRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.survey.v1.SurveyTemplate'
+  /v1/survey-templates/{id}:
+    get:
+      tags:
+      - SurveyService
+      description: ===== TEMPLATES (Optional Admin/Setup) =====
+      operationId: SurveyService_GetSurveyTemplate
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.survey.v1.SurveyTemplate'
+  /v1/survey-templates/{templateId}/sections:
+    get:
+      tags:
+      - SurveyService
+      description: ===== SECTIONS & QUESTIONS =====
+      operationId: SurveyService_ListSurveySections
+      parameters:
+      - name: templateId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.survey.v1.ListSurveySectionsResponse'
+  /v1/surveys:
+    get:
+      tags:
+      - SurveyService
+      description: ===== GLOBAL LIST (Mobile App / Backend Filter) =====
+      operationId: SurveyService_ListSurveys
+      parameters:
+      - name: pageSize
+        in: query
+        schema:
+          type: integer
+          format: int32
+      - name: cursor
+        in: query
+        schema:
+          type: string
+      - name: status
+        in: query
+        schema:
+          type: string
+      - name: applicationId
+        in: query
+        schema:
+          type: string
+      - name: assignedTo
+        in: query
+        schema:
+          type: string
+      - name: surveyType
+        in: query
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.survey.v1.ListSurveysResponse'
+  /v1/surveys/{id}:
+    get:
+      tags:
+      - SurveyService
+      operationId: SurveyService_GetSurvey
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.survey.v1.ApplicationSurvey'
+  /v1/surveys/{id}/start:
+    put:
+      tags:
+      - SurveyService
+      description: ===== WORKFLOW =====
+      operationId: SurveyService_StartSurvey
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/api.survey.v1.StartSurveyRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.survey.v1.ApplicationSurvey'
+  /v1/surveys/{id}/submit:
+    put:
+      tags:
+      - SurveyService
+      operationId: SurveyService_SubmitSurvey
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/api.survey.v1.SubmitSurveyRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.survey.v1.ApplicationSurvey'
+  /v1/surveys/{id}/verify:
+    put:
+      tags:
+      - SurveyService
+      operationId: SurveyService_VerifySurvey
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/api.survey.v1.VerifySurveyRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.survey.v1.ApplicationSurvey'
+  /v1/surveys/{surveyId}/answers:
+    post:
+      tags:
+      - SurveyService
+      description: ===== ANSWERS & EVIDENCE =====
+      operationId: SurveyService_SubmitSurveyAnswer
+      parameters:
+      - name: surveyId
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/api.survey.v1.SubmitSurveyAnswerRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.survey.v1.SurveyAnswer'
+  /v1/surveys/{surveyId}/evidences:
+    post:
+      tags:
+      - SurveyService
+      operationId: SurveyService_UploadSurveyEvidence
+      parameters:
+      - name: surveyId
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/api.survey.v1.UploadSurveyEvidenceRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.survey.v1.SurveyEvidence'
+components:
+  schemas:
+    api.applicant.v1.Applicant:
+      type: object
+      properties:
+        id:
+          type: string
+        applicantType:
+          type: string
+        identityNumber:
+          type: string
+        taxId:
+          type: string
+        fullName:
+          type: string
+        birthDate:
+          type: string
+        establishmentDate:
+          type: string
+        attributes:
+          type: array
+          items:
+            $ref: '#/components/schemas/api.applicant.v1.ApplicantAttribute'
+        createdAt:
+          type: string
+          format: date-time
+    api.applicant.v1.ApplicantAttribute:
+      type: object
+      properties:
+        attributeId:
+          type: string
+        value:
+          type: string
+        dataType:
+          type: string
+        updatedAt:
+          type: string
+          format: date-time
+        attributeOptionId:
+          type: string
+    api.applicant.v1.ApplicantAttributes:
+      type: object
+      properties:
+        attributes:
+          type: array
+          items:
+            $ref: '#/components/schemas/api.applicant.v1.ApplicantAttribute'
+    api.applicant.v1.CreateApplicantRequest:
+      type: object
+      properties:
+        applicantType:
+          type: string
+        identityNumber:
+          type: string
+        taxId:
+          type: string
+        fullName:
+          type: string
+        birthDate:
+          type: string
+        establishmentDate:
+          type: string
+        attributes:
+          type: array
+          items:
+            $ref: '#/components/schemas/api.applicant.v1.ApplicantAttribute'
+    api.applicant.v1.ListApplicantsResponse:
+      type: object
+      properties:
+        applicants:
+          type: array
+          items:
+            $ref: '#/components/schemas/api.applicant.v1.Applicant'
+        nextCursor:
+          type: string
+          description: Token untuk mengambil halaman berikutnya (opaque token).
+        hasNext:
+          type: boolean
+          description: Flag apakah ada halaman berikutnya.
+    api.applicant.v1.UpdateApplicantRequest:
+      type: object
+      properties:
+        id:
+          type: string
+        applicantType:
+          type: string
+        identityNumber:
+          type: string
+        taxId:
+          type: string
+        fullName:
+          type: string
+        birthDate:
+          type: string
+        establishmentDate:
+          type: string
+        attributes:
+          type: array
+          items:
+            $ref: '#/components/schemas/api.applicant.v1.ApplicantAttribute'
+    api.applicant.v1.UpsertApplicantAttributesRequest:
+      type: object
+      properties:
+        applicantId:
+          type: string
+        attributes:
+          type: array
+          items:
+            $ref: '#/components/schemas/api.applicant.v1.ApplicantAttribute'
+    api.application.v1.AddPartyToApplicationRequest:
+      type: object
+      properties:
+        applicationId:
+          type: string
+        partyId:
+          type: string
+        roleCode:
+          type: string
+        slikRequired:
+          type: boolean
+    api.application.v1.Application:
+      type: object
+      properties:
+        id:
+          type: string
+        applicantId:
+          type: string
+        applicantName:
+          type: string
+        productId:
+          type: string
+        aoId:
+          type: string
+        loanAmount:
+          type: string
+        tenorMonths:
+          type: integer
+          format: int32
+        interestType:
+          type: string
+        interestRate:
+          type: string
+        loanPurpose:
+          type: string
+        applicationChannel:
+          type: string
+        status:
+          type: string
+        branchCode:
+          type: string
+        attributes:
+          type: array
+          items:
+            $ref: '#/components/schemas/api.application.v1.ApplicationAttribute'
+        submittedAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+    api.application.v1.ApplicationAttribute:
+      type: object
+      properties:
+        attributeId:
+          type: string
+        value:
+          type: string
+        dataType:
+          type: string
+        attributeOptionId:
+          type: string
+    api.application.v1.ApplicationAttributes:
+      type: object
+      properties:
+        attributes:
+          type: array
+          items:
+            $ref: '#/components/schemas/api.application.v1.ApplicationAttribute'
+    api.application.v1.ApplicationDocument:
+      type: object
+      properties:
+        id:
+          type: string
+        applicationId:
+          type: string
+        documentName:
+          type: string
+        fileUrl:
+          type: string
+        documentType:
+          type: string
+        uploadedAt:
+          type: string
+          format: date-time
+    api.application.v1.ApplicationParty:
+      type: object
+      properties:
+        applicationId:
+          type: string
+        partyId:
+          type: string
+        partyType:
+          type: string
+        name:
+          type: string
+        identifier:
+          type: string
+        roleCode:
+          type: string
+        legalObligation:
+          type: boolean
+        slikRequired:
+          type: boolean
+    api.application.v1.ChangeApplicationStatusRequest:
+      type: object
+      properties:
+        id:
+          type: string
+        newStatus:
+          type: string
+        reason:
+          type: string
+    api.application.v1.CreateApplicationRequest:
+      type: object
+      properties:
+        applicantId:
+          type: string
+        productId:
+          type: string
+        aoId:
+          type: string
+        loanAmount:
+          type: string
+        tenorMonths:
+          type: integer
+          format: int32
+        interestType:
+          type: string
+        interestRate:
+          type: string
+        loanPurpose:
+          type: string
+        applicationChannel:
+          type: string
+        branchCode:
+          type: string
+        attributes:
+          type: array
+          items:
+            $ref: '#/components/schemas/api.application.v1.ApplicationAttribute'
+    api.application.v1.GetPresignedUrlResponse:
+      type: object
+      properties:
+        uploadUrl:
+          type: string
+        fileUrl:
+          type: string
+    api.application.v1.ListApplicationDocumentsResponse:
+      type: object
+      properties:
+        documents:
+          type: array
+          items:
+            $ref: '#/components/schemas/api.application.v1.ApplicationDocument'
+    api.application.v1.ListApplicationPartiesResponse:
+      type: object
+      properties:
+        parties:
+          type: array
+          items:
+            $ref: '#/components/schemas/api.application.v1.ApplicationParty'
+    api.application.v1.ListApplicationsResponse:
+      type: object
+      properties:
+        applications:
+          type: array
+          items:
+            $ref: '#/components/schemas/api.application.v1.Application'
+        nextCursor:
+          type: string
+          description: Token untuk mengambil halaman berikutnya (opaque token).
+        hasNext:
+          type: boolean
+          description: Flag apakah ada halaman berikutnya.
+    api.application.v1.UpdateApplicationRequest:
+      type: object
+      properties:
+        id:
+          type: string
+        applicantId:
+          type: string
+        productId:
+          type: string
+        aoId:
+          type: string
+        loanAmount:
+          type: string
+        tenorMonths:
+          type: integer
+          format: int32
+        interestType:
+          type: string
+        interestRate:
+          type: string
+        loanPurpose:
+          type: string
+        status:
+          type: string
+        attributes:
+          type: array
+          items:
+            $ref: '#/components/schemas/api.application.v1.ApplicationAttribute'
+    api.application.v1.UploadApplicationDocumentRequest:
+      type: object
+      properties:
+        applicationId:
+          type: string
+        documentName:
+          type: string
+        fileUrl:
+          type: string
+        documentType:
+          type: string
+    api.application.v1.UpsertApplicationAttributesRequest:
+      type: object
+      properties:
+        applicationId:
+          type: string
+        attributes:
+          type: array
+          items:
+            $ref: '#/components/schemas/api.application.v1.ApplicationAttribute'
+    api.decision.v1.AddDecisionConditionRequest:
+      type: object
+      properties:
+        applicationId:
+          type: string
+        conditionText:
+          type: string
+    api.decision.v1.ApplicationDecision:
+      type: object
+      properties:
+        id:
+          type: string
+        applicationId:
+          type: string
+        decision:
+          type: string
+        decisionSource:
+          type: string
+        finalAmount:
+          type: string
+        finalTenor:
+          type: integer
+          format: int32
+        finalInterestRate:
+          type: string
+        decisionReason:
+          type: string
+        decidedBy:
+          type: string
+        decidedAt:
+          type: string
+          format: date-time
+    api.decision.v1.CommitteeDecision:
+      type: object
+      properties:
+        id:
+          type: string
+        committeeSessionId:
+          type: string
+        decision:
+          type: string
+        decisionReason:
+          type: string
+        approvedAmount:
+          type: string
+        approvedTenor:
+          type: integer
+          format: int32
+        approvedInterestRate:
+          type: string
+        requiresNextCommittee:
+          type: boolean
+        decidedAt:
+          type: string
+          format: date-time
+    api.decision.v1.CommitteeSession:
+      type: object
+      properties:
+        id:
+          type: string
+        applicationId:
+          type: string
+        sessionSequence:
+          type: integer
+          format: int32
+        status:
+          type: string
+        scheduledAt:
+          type: string
+          format: date-time
+        startedAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: string
+          format: date-time
+    api.decision.v1.CommitteeVote:
+      type: object
+      properties:
+        id:
+          type: string
+        committeeSessionId:
+          type: string
+        userId:
+          type: string
+        vote:
+          type: string
+        voteReason:
+          type: string
+        votedAt:
+          type: string
+          format: date-time
+    api.decision.v1.CreateCommitteeSessionRequest:
+      type: object
+      properties:
+        applicationId:
+          type: string
+        sessionSequence:
+          type: integer
+          format: int32
+        scheduledAt:
+          type: string
+          format: date-time
+    api.decision.v1.DecisionCondition:
+      type: object
+      properties:
+        id:
+          type: string
+        applicationId:
+          type: string
+        conditionText:
+          type: string
+        isMet:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+    api.decision.v1.FinalizeCommitteeDecisionRequest:
+      type: object
+      properties:
+        committeeSessionId:
+          type: string
+        decision:
+          type: string
+        decisionReason:
+          type: string
+        approvedAmount:
+          type: string
+        approvedTenor:
+          type: integer
+          format: int32
+        approvedInterestRate:
+          type: string
+        requiresNextCommittee:
+          type: boolean
+    api.decision.v1.ListCommitteeSessionsResponse:
+      type: object
+      properties:
+        sessions:
+          type: array
+          items:
+            $ref: '#/components/schemas/api.decision.v1.CommitteeSession'
+    api.decision.v1.ListDecisionConditionsResponse:
+      type: object
+      properties:
+        conditions:
+          type: array
+          items:
+            $ref: '#/components/schemas/api.decision.v1.DecisionCondition'
+    api.decision.v1.RecordFinalDecisionRequest:
+      type: object
+      properties:
+        applicationId:
+          type: string
+        decision:
+          type: string
+        decisionSource:
+          type: string
+        finalAmount:
+          type: string
+        finalTenor:
+          type: integer
+          format: int32
+        finalInterestRate:
+          type: string
+        decisionReason:
+          type: string
+        decidedBy:
+          type: string
+    api.decision.v1.SubmitCommitteeVoteRequest:
+      type: object
+      properties:
+        committeeSessionId:
+          type: string
+        userId:
+          type: string
+        vote:
+          type: string
+        voteReason:
+          type: string
+    api.financial.v1.AddAssetRequest:
+      type: object
+      properties:
+        applicationId:
+          type: string
+        assetTypeCode:
+          type: string
+        assetName:
+          type: string
+        ownershipStatus:
+          type: string
+        acquisitionYear:
+          type: integer
+          format: int32
+        estimatedValue:
+          type: string
+        valuationMethod:
+          type: string
+        locationText:
+          type: string
+        encumbered:
+          type: boolean
+    api.financial.v1.AddLiabilityRequest:
+      type: object
+      properties:
+        applicationId:
+          type: string
+        creditorName:
+          type: string
+        liabilityType:
+          type: string
+        outstandingAmount:
+          type: string
+        monthlyInstallment:
+          type: string
+        interestRate:
+          type: string
+        maturityDate:
+          type: string
+        source:
+          type: string
+    api.financial.v1.ApplicationAsset:
+      type: object
+      properties:
+        id:
+          type: string
+        applicationId:
+          type: string
+        assetTypeCode:
+          type: string
+        assetName:
+          type: string
+        ownershipStatus:
+          type: string
+        acquisitionYear:
+          type: integer
+          format: int32
+        estimatedValue:
+          type: string
+        valuationMethod:
+          type: string
+        locationText:
+          type: string
+        encumbered:
+          type: boolean
+    api.financial.v1.ApplicationFinancialFact:
+      type: object
+      properties:
+        id:
+          type: string
+        applicationId:
+          type: string
+        glCode:
+          type: string
+        periodType:
+          type: string
+        periodLabel:
+          type: string
+        amount:
+          type: string
+        source:
+          type: string
+        confidenceLevel:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+    api.financial.v1.ApplicationLiability:
+      type: object
+      properties:
+        id:
+          type: string
+        applicationId:
+          type: string
+        creditorName:
+          type: string
+        liabilityType:
+          type: string
+        outstandingAmount:
+          type: string
+        monthlyInstallment:
+          type: string
+        interestRate:
+          type: string
+        maturityDate:
+          type: string
+        source:
+          type: string
+    api.financial.v1.CalculateFinancialRatiosRequest:
+      type: object
+      properties:
+        applicationId:
+          type: string
+    api.financial.v1.FinancialRatio:
+      type: object
+      properties:
+        id:
+          type: string
+        applicationId:
+          type: string
+        ratioCode:
+          type: string
+        ratioValue:
+          type: string
+        calculationVersion:
+          type: string
+        calculatedAt:
+          type: string
+          format: date-time
+    api.financial.v1.ListAssetsResponse:
+      type: object
+      properties:
+        assets:
+          type: array
+          items:
+            $ref: '#/components/schemas/api.financial.v1.ApplicationAsset'
+    api.financial.v1.ListFinancialFactsResponse:
+      type: object
+      properties:
+        facts:
+          type: array
+          items:
+            $ref: '#/components/schemas/api.financial.v1.ApplicationFinancialFact'
+    api.financial.v1.ListFinancialRatiosResponse:
+      type: object
+      properties:
+        ratios:
+          type: array
+          items:
+            $ref: '#/components/schemas/api.financial.v1.FinancialRatio'
+    api.financial.v1.ListLiabilitiesResponse:
+      type: object
+      properties:
+        liabilities:
+          type: array
+          items:
+            $ref: '#/components/schemas/api.financial.v1.ApplicationLiability'
+    api.financial.v1.UpdateAssetRequest:
+      type: object
+      properties:
+        id:
+          type: string
+        applicationId:
+          type: string
+        assetTypeCode:
+          type: string
+        assetName:
+          type: string
+        ownershipStatus:
+          type: string
+        acquisitionYear:
+          type: integer
+          format: int32
+        estimatedValue:
+          type: string
+        valuationMethod:
+          type: string
+        locationText:
+          type: string
+        encumbered:
+          type: boolean
+    api.financial.v1.UpdateLiabilityRequest:
+      type: object
+      properties:
+        id:
+          type: string
+        applicationId:
+          type: string
+        creditorName:
+          type: string
+        liabilityType:
+          type: string
+        outstandingAmount:
+          type: string
+        monthlyInstallment:
+          type: string
+        interestRate:
+          type: string
+        maturityDate:
+          type: string
+        source:
+          type: string
+    api.financial.v1.UpsertFinancialFactRequest:
+      type: object
+      properties:
+        applicationId:
+          type: string
+        glCode:
+          type: string
+        periodType:
+          type: string
+        periodLabel:
+          type: string
+        amount:
+          type: string
+        source:
+          type: string
+        confidenceLevel:
+          type: string
+    helloworld.v1.HelloReply:
+      type: object
+      properties:
+        message:
+          type: string
+      description: The response message containing the greetings
+    api.reference.v1.ApplicationStatusRef:
+      type: object
+      properties:
+        statusCode:
+          type: string
+        statusGroup:
+          type: string
+        isTerminal:
+          type: boolean
+        description:
+          type: string
+    api.reference.v1.AttributeCategory:
+      type: object
+      properties:
+        categoryCode:
+          type: string
+        categoryName:
+          type: string
+        uiIcon:
+          type: string
+        displayOrder:
+          type: integer
+          format: int32
+        description:
+          type: string
+    api.reference.v1.AttributeOption:
+      type: object
+      properties:
+        id:
+          type: string
+        attributeId:
+          type: string
+        optionValue:
+          type: string
+        optionLabel:
+          type: string
+        displayOrder:
+          type: integer
+          format: int32
+        isActive:
+          type: boolean
+    api.reference.v1.AttributeRegistry:
+      type: object
+      properties:
+        id:
+          type: string
+        attributeCode:
+          type: string
+        appliesTo:
+          type: string
+        scope:
+          type: string
+        dataType:
+          type: string
+        categoryCode:
+          type: string
+        uiLabel:
+          type: string
+        isRequired:
+          type: boolean
+        riskRelevant:
+          type: boolean
+        isActive:
+          type: boolean
+        displayOrder:
+          type: integer
+          format: int32
+        description:
+          type: string
+        categoryName:
+          type: string
+          description: Denormalized dari JOIN (read-only, tidak disimpan di tabel
+            registry)
+        categoryIcon:
+          type: string
+        options:
+          type: array
+          items:
+            $ref: '#/components/schemas/api.reference.v1.AttributeOption'
+    api.reference.v1.Branch:
+      type: object
+      properties:
+        branchCode:
+          type: string
+        branchName:
+          type: string
+        regionCode:
+          type: string
+    api.reference.v1.CreateAttributeCategoryRequest:
+      type: object
+      properties:
+        categoryCode:
+          type: string
+        categoryName:
+          type: string
+        uiIcon:
+          type: string
+        displayOrder:
+          type: integer
+          format: int32
+        description:
+          type: string
+    api.reference.v1.CreateAttributeRegistryRequest:
+      type: object
+      properties:
+        attributeCode:
+          type: string
+        appliesTo:
+          type: string
+        scope:
+          type: string
+        valueType:
+          type: string
+        categoryCode:
+          type: string
+        uiLabel:
+          type: string
+        isRequired:
+          type: boolean
+        riskRelevant:
+          type: boolean
+        isActive:
+          type: boolean
+        displayOrder:
+          type: integer
+          format: int32
+        description:
+          type: string
+    api.reference.v1.FinancialGLAccount:
+      type: object
+      properties:
+        glCode:
+          type: string
+        glName:
+          type: string
+        statementType:
+          type: string
+        category:
+          type: string
+        sign:
+          type: integer
+          format: int32
+        isDebtService:
+          type: boolean
+        isOperating:
+          type: boolean
+        description:
+          type: string
+    api.reference.v1.ListApplicationStatusesResponse:
+      type: object
+      properties:
+        statuses:
+          type: array
+          items:
+            $ref: '#/components/schemas/api.reference.v1.ApplicationStatusRef'
+    api.reference.v1.ListAttributeCategoriesResponse:
+      type: object
+      properties:
+        categories:
+          type: array
+          items:
+            $ref: '#/components/schemas/api.reference.v1.AttributeCategory'
+    api.reference.v1.ListAttributeRegistryResponse:
+      type: object
+      properties:
+        attributes:
+          type: array
+          items:
+            $ref: '#/components/schemas/api.reference.v1.AttributeRegistry'
+    api.reference.v1.ListBranchesResponse:
+      type: object
+      properties:
+        branches:
+          type: array
+          items:
+            $ref: '#/components/schemas/api.reference.v1.Branch'
+    api.reference.v1.ListFinancialGLAccountsResponse:
+      type: object
+      properties:
+        accounts:
+          type: array
+          items:
+            $ref: '#/components/schemas/api.reference.v1.FinancialGLAccount'
+    api.reference.v1.ListLoanOfficersResponse:
+      type: object
+      properties:
+        officers:
+          type: array
+          items:
+            $ref: '#/components/schemas/api.reference.v1.LoanOfficer'
+    api.reference.v1.ListLoanProductsResponse:
+      type: object
+      properties:
+        products:
+          type: array
+          items:
+            $ref: '#/components/schemas/api.reference.v1.LoanProduct'
+    api.reference.v1.ListSurveyTemplatesResponse:
+      type: object
+      properties:
+        templates:
+          type: array
+          items:
+            $ref: '#/components/schemas/api.reference.v1.SurveyTemplate'
+    api.reference.v1.LoanOfficer:
+      type: object
+      properties:
+        id:
+          type: string
+        officerCode:
+          type: string
+        branchCode:
+          type: string
+    api.reference.v1.LoanProduct:
+      type: object
+      properties:
+        id:
+          type: string
+        productCode:
+          type: string
+        productName:
+          type: string
+        segment:
+          type: string
+        active:
+          type: boolean
+    api.reference.v1.SurveyTemplate:
+      type: object
+      properties:
+        id:
+          type: string
+        templateCode:
+          type: string
+        templateName:
+          type: string
+        applicantType:
+          type: string
+        productId:
+          type: string
+    api.reference.v1.UpdateAttributeCategoryRequest:
+      type: object
+      properties:
+        categoryCode:
+          type: string
+        categoryName:
+          type: string
+        uiIcon:
+          type: string
+        displayOrder:
+          type: integer
+          format: int32
+        description:
+          type: string
+    api.reference.v1.UpdateAttributeRegistryRequest:
+      type: object
+      properties:
+        id:
+          type: string
+        attributeCode:
+          type: string
+        appliesTo:
+          type: string
+        scope:
+          type: string
+        valueType:
+          type: string
+        categoryCode:
+          type: string
+        uiLabel:
+          type: string
+        isRequired:
+          type: boolean
+        riskRelevant:
+          type: boolean
+        isActive:
+          type: boolean
+        displayOrder:
+          type: integer
+          format: int32
+        description:
+          type: string
+    api.survey.v1.ApplicationSurvey:
+      type: object
+      properties:
+        id:
+          type: string
+        applicationId:
+          type: string
+        templateId:
+          type: string
+        surveyType:
+          type: string
+        status:
+          type: string
+        assignedTo:
+          type: string
+        surveyPurpose:
+          type: string
+        startedAt:
+          type: string
+          format: date-time
+        submittedAt:
+          type: string
+          format: date-time
+        submittedBy:
+          type: string
+        applicantName:
+          type: string
+          description: 'Enrichment (Optional): Membantu mobile app menampilkan data
+            list tanpa hit API tambahan'
+        applicationStatus:
+          type: string
+        totalQuestions:
+          type: integer
+          description: Progress (e.g., 2/15)
+          format: int32
+        answeredQuestions:
+          type: integer
+          format: int32
+    api.survey.v1.AssignSurveyRequest:
+      type: object
+      properties:
+        applicationId:
+          type: string
+        templateId:
+          type: string
+        surveyType:
+          type: string
+        assignedTo:
+          type: string
+        surveyPurpose:
+          type: string
+    api.survey.v1.CreateSurveyTemplateRequest:
+      type: object
+      properties:
+        templateCode:
+          type: string
+        templateName:
+          type: string
+        applicantType:
+          type: string
+        productId:
+          type: string
+        active:
+          type: boolean
+    api.survey.v1.ListSurveyQuestionsResponse:
+      type: object
+      properties:
+        questions:
+          type: array
+          items:
+            $ref: '#/components/schemas/api.survey.v1.SurveyQuestion'
+    api.survey.v1.ListSurveySectionsResponse:
+      type: object
+      properties:
+        sections:
+          type: array
+          items:
+            $ref: '#/components/schemas/api.survey.v1.SurveySection'
+    api.survey.v1.ListSurveyTemplatesResponse:
+      type: object
+      properties:
+        templates:
+          type: array
+          items:
+            $ref: '#/components/schemas/api.survey.v1.SurveyTemplate'
+    api.survey.v1.ListSurveysByApplicationResponse:
+      type: object
+      properties:
+        surveys:
+          type: array
+          items:
+            $ref: '#/components/schemas/api.survey.v1.ApplicationSurvey'
+    api.survey.v1.ListSurveysResponse:
+      type: object
+      properties:
+        surveys:
+          type: array
+          items:
+            $ref: '#/components/schemas/api.survey.v1.ApplicationSurvey'
+        nextCursor:
+          type: string
+        hasNext:
+          type: boolean
+    api.survey.v1.StartSurveyRequest:
+      type: object
+      properties:
+        id:
+          type: string
+        userId:
+          type: string
+    api.survey.v1.SubmitSurveyAnswerRequest:
+      type: object
+      properties:
+        surveyId:
+          type: string
+        questionId:
+          type: string
+        answerText:
+          type: string
+        answerNumber:
+          type: string
+        answerBoolean:
+          type: boolean
+        answerDate:
+          type: string
+    api.survey.v1.SubmitSurveyRequest:
+      type: object
+      properties:
+        id:
+          type: string
+        userId:
+          type: string
+    api.survey.v1.SurveyAnswer:
+      type: object
+      properties:
+        id:
+          type: string
+        surveyId:
+          type: string
+        questionId:
+          type: string
+        answerText:
+          type: string
+        answerNumber:
+          type: string
+        answerBoolean:
+          type: boolean
+        answerDate:
+          type: string
+        answeredAt:
+          type: string
+          format: date-time
+    api.survey.v1.SurveyEvidence:
+      type: object
+      properties:
+        id:
+          type: string
+        surveyId:
+          type: string
+        evidenceType:
+          type: string
+        fileUrl:
+          type: string
+        description:
+          type: string
+        capturedAt:
+          type: string
+          format: date-time
+    api.survey.v1.SurveyQuestion:
+      type: object
+      properties:
+        id:
+          type: string
+        sectionId:
+          type: string
+        questionText:
+          type: string
+        answerType:
+          type: string
+        sequence:
+          type: integer
+          format: int32
+        isRequired:
+          type: boolean
+        options:
+          type: array
+          items:
+            $ref: '#/components/schemas/api.survey.v1.SurveyQuestionOption'
+    api.survey.v1.SurveyQuestionOption:
+      type: object
+      properties:
+        id:
+          type: string
+        questionId:
+          type: string
+        optionText:
+          type: string
+        optionValue:
+          type: string
+    api.survey.v1.SurveySection:
+      type: object
+      properties:
+        id:
+          type: string
+        templateId:
+          type: string
+        sectionName:
+          type: string
+        sequence:
+          type: integer
+          format: int32
+        questions:
+          type: array
+          items:
+            $ref: '#/components/schemas/api.survey.v1.SurveyQuestion'
+    api.survey.v1.SurveyTemplate:
+      type: object
+      properties:
+        id:
+          type: string
+        templateCode:
+          type: string
+        templateName:
+          type: string
+        applicantType:
+          type: string
+        productId:
+          type: string
+        active:
+          type: boolean
+        sections:
+          type: array
+          items:
+            $ref: '#/components/schemas/api.survey.v1.SurveySection'
+    api.survey.v1.UploadSurveyEvidenceRequest:
+      type: object
+      properties:
+        surveyId:
+          type: string
+        evidenceType:
+          type: string
+        fileUrl:
+          type: string
+        description:
+          type: string
+    api.survey.v1.VerifySurveyRequest:
+      type: object
+      properties:
+        id:
+          type: string
+        userId:
+          type: string
+tags:
+- name: ApplicantService
+- name: ApplicationService
+- name: PartyService
+- name: CommitteeService
+- name: DecisionService
+- name: FinancialService
+- name: Greeter
+- name: ReferenceService
+- name: SurveyService

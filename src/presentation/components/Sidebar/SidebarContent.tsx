@@ -1,12 +1,20 @@
 import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
-import { X, Home, Clock, User } from 'lucide-react-native';
+import { X, Home, Clock, User, Users } from 'lucide-react-native';
+import { useAppNavigator } from '../../context/NavigationContext';
 
 interface SidebarContentProps {
     onClose: () => void;
 }
 
 export function SidebarContent({ onClose }: SidebarContentProps) {
+    const { currentScreen, navigate } = useAppNavigator();
+
+    const handleNavigate = (screen: any) => {
+        navigate(screen);
+        onClose();
+    };
+
     return (
         <View className="flex-1">
             <View className="flex-row justify-between items-center px-5 py-5 border-b border-white/10">
@@ -20,11 +28,14 @@ export function SidebarContent({ onClose }: SidebarContentProps) {
             </View>
 
             <View className="mt-2">
-                {/* Active Item */}
-                <TouchableOpacity className="flex-row items-center py-4 px-5 bg-white/20">
+                <TouchableOpacity
+                    className={`flex-row items-center py-4 px-5 ${currentScreen === 'Dashboard' ? 'bg-white/20' : ''}`}
+                    onPress={() => handleNavigate('Dashboard')}
+                >
                     <Home color="#fff" size={20} />
                     <Text className="text-white text-base ml-4 font-medium">Dashboard</Text>
                 </TouchableOpacity>
+
 
                 <TouchableOpacity className="flex-row items-center py-4 px-5">
                     <Clock color="#fff" size={20} />

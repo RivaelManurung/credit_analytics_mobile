@@ -1,192 +1,102 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { SurveyRepositoryImpl } from '../../data/repositories/SurveyRepositoryImpl';
-import { ApplicationSurvey, SurveyTemplate } from '../../gen/survey/v1/survey_pb';
+import { ApplicationSurvey, SurveyTemplate, SurveySection } from '../../gen/survey/v1/survey_pb';
 
 const surveyRepo = new SurveyRepositoryImpl();
 
+// --- Query Keys ---
+export const surveyKeys = {
+    all: ['surveys'] as const,
+    lists: () => [...surveyKeys.all, 'list'] as const,
+    list: (assignedTo: string) => [...surveyKeys.lists(), { assignedTo }] as const,
+    details: () => [...surveyKeys.all, 'detail'] as const,
+    detail: (id: string) => [...surveyKeys.details(), id] as const,
+    templates: () => ['templates'] as const,
+    template: (id: string) => [...surveyKeys.templates(), id] as const,
+    sections: (templateId: string) => ['sections', templateId] as const,
+};
+
+// --- Hooks ---
+
 export function useSurveyTemplate(id: string) {
-    const [template, setTemplate] = useState<SurveyTemplate | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<Error | null>(null);
-
-    const fetchTemplate = useCallback(async () => {
-        if (!id) return;
-        try {
-            setLoading(true);
-            setError(null);
-            const data = await surveyRepo.getSurveyTemplate(id);
-            setTemplate(data);
-        } catch (err) {
-            setError(err instanceof Error ? err : new Error('Failed to fetch survey template'));
-        } finally {
-            setLoading(false);
-        }
-    }, [id]);
-
-    useEffect(() => {
-        fetchTemplate();
-    }, [fetchTemplate]);
-
-    return { template, loading, error, refetch: fetchTemplate };
+    return useQuery({
+        queryKey: surveyKeys.template(id),
+        queryFn: () => surveyRepo.getSurveyTemplate(id),
+        enabled: !!id,
+    });
 }
 
 export function useSurveyTemplates() {
-    const [templates, setTemplates] = useState<SurveyTemplate[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<Error | null>(null);
-
-    const fetchTemplates = useCallback(async () => {
-        try {
-            setLoading(true);
-            setError(null);
-            const data = await surveyRepo.listSurveyTemplates();
-            setTemplates(data);
-        } catch (err) {
-            setError(err instanceof Error ? err : new Error('Failed to fetch survey templates'));
-        } finally {
-            setLoading(false);
-        }
-    }, []);
-
-    useEffect(() => {
-        fetchTemplates();
-    }, [fetchTemplates]);
-
-    return { templates, loading, error, refetch: fetchTemplates };
+    return useQuery({
+        queryKey: surveyKeys.templates(),
+        queryFn: () => surveyRepo.listSurveyTemplates(),
+    });
 }
 
-export function useMySurveys(assignedTo?: string, status?: string) {
-    const [surveys, setSurveys] = useState<ApplicationSurvey[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<Error | null>(null);
-
-    const fetchSurveys = useCallback(async () => {
-        try {
-            setLoading(true);
-            setError(null);
-            const data = await surveyRepo.listSurveys(assignedTo, status);
-            setSurveys(data);
-        } catch (err) {
-            setError(err instanceof Error ? err : new Error('Failed to fetch surveys'));
-        } finally {
-            setLoading(false);
-        }
-    }, [assignedTo, status]);
-
-    useEffect(() => {
-        fetchSurveys();
-    }, [fetchSurveys]);
-
-    return { surveys, loading, error, refetch: fetchSurveys };
+export function useSurvey(id: string) {
+    return useQuery({
+        queryKey: surveyKeys.detail(id),
+        queryFn: () => surveyRepo.getSurvey(id),
+        enabled: !!id,
+    });
 }
 
-export function useSurveysByApplication(applicationId: string) {
-    const [surveys, setSurveys] = useState<ApplicationSurvey[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<Error | null>(null);
+export function useMySurveys(assignedTo: string) {
+    return useQuery({
+        queryKey: surveyKeys.list(assignedTo),
+        queryFn: () => surveyRepo.listSurveys(assignedTo),
+        enabled: !!assignedTo,
+    });
+}
 
-    const fetchSurveys = useCallback(async (appId: string) => {
-        try {
-            setLoading(true);
-            setError(null);
-            const data = await surveyRepo.listSurveysByApplication(appId);
-            setSurveys(data);
-        } catch (err) {
-            setError(err instanceof Error ? err : new Error('Failed to fetch surveys'));
-        } finally {
-            setLoading(false);
-        }
-    }, []);
-
-    useEffect(() => {
-        if (applicationId) {
-            fetchSurveys(applicationId);
-        }
-    }, [applicationId, fetchSurveys]);
-
-    return { surveys, loading, error, refetch: () => fetchSurveys(applicationId) };
+export function useSurveySections(templateId: string) {
+    return useQuery({
+        queryKey: surveyKeys.sections(templateId),
+        queryFn: () => surveyRepo.listSurveySections(templateId),
+        enabled: !!templateId,
+    });
 }
 
 export function useSurveyControl() {
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState<Error | null>(null);
+    const queryClient = useQueryClient();
 
-    const startSurvey = async (id: string, userId: string): Promise<ApplicationSurvey | null> => {
-        try {
-            setLoading(true);
-            setError(null);
-            const survey = await surveyRepo.startSurvey(id, userId);
-            return survey;
-        } catch (err) {
-            setError(err instanceof Error ? err : new Error('Failed to start survey'));
-            return null;
-        } finally {
-            setLoading(false);
+    const startMutation = useMutation({
+        mutationFn: ({ id, userId }: { id: string; userId: string }) =>
+            surveyRepo.startSurvey(id, userId),
+        onSuccess: (data) => {
+            if (data) queryClient.invalidateQueries({ queryKey: surveyKeys.all });
         }
-    }, submitSurvey = async (id: string, userId: string): Promise<ApplicationSurvey | null> => {
-        try {
-            setLoading(true);
-            setError(null);
-            const survey = await surveyRepo.submitSurvey(id, userId);
-            return survey;
-        } catch (err) {
-            setError(err instanceof Error ? err : new Error('Failed to submit survey'));
-            return null;
-        } finally {
-            setLoading(false);
+    });
+
+    const submitMutation = useMutation({
+        mutationFn: ({ id, userId }: { id: string; userId: string }) =>
+            surveyRepo.submitSurvey(id, userId),
+        onSuccess: (data) => {
+            if (data) queryClient.invalidateQueries({ queryKey: surveyKeys.all });
         }
+    });
+
+    const assignMutation = useMutation({
+        mutationFn: (params: { applicationId: string, templateId: string, surveyType: string, assignedTo: string, surveyPurpose: string }) =>
+            surveyRepo.assignSurvey(params.applicationId, params.templateId, params.surveyType, params.assignedTo, params.surveyPurpose),
+        onSuccess: (data) => {
+            if (data) queryClient.invalidateQueries({ queryKey: surveyKeys.all });
+        }
+    });
+
+    const answerMutation = useMutation({
+        mutationFn: (params: { surveyId: string, questionId: string, answer: any }) =>
+            surveyRepo.submitSurveyAnswer(params.surveyId, params.questionId, params.answer),
+    });
+
+    return {
+        startSurvey: (id: string, userId: string) => startMutation.mutateAsync({ id, userId }),
+        submitSurvey: (id: string, userId: string) => submitMutation.mutateAsync({ id, userId }),
+        assignSurvey: (applicationId: string, templateId: string, surveyType: string, assignedTo: string, surveyPurpose: string) =>
+            assignMutation.mutateAsync({ applicationId, templateId, surveyType, assignedTo, surveyPurpose }),
+        submitSurveyAnswer: (surveyId: string, questionId: string, answer: any) =>
+            answerMutation.mutateAsync({ surveyId, questionId, answer }),
+        loading: startMutation.isPending || submitMutation.isPending || assignMutation.isPending,
+        error: startMutation.error || submitMutation.error || assignMutation.error
     };
-
-    const assignSurvey = async (applicationId: string, templateId: string, surveyType: string, assignedTo: string, surveyPurpose: string): Promise<ApplicationSurvey | null> => {
-        try {
-            setLoading(true);
-            setError(null);
-            const survey = await surveyRepo.assignSurvey(applicationId, templateId, surveyType, assignedTo, surveyPurpose);
-            return survey;
-        } catch (err: any) {
-            console.error('[useSurveyControl] Assign Survey Error:', err.message || err);
-            setError(err instanceof Error ? err : new Error('Failed to assign survey'));
-            return null;
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const submitSurveyAnswer = async (surveyId: string, questionId: string, answer: { text?: string, number?: string, boolean?: boolean, date?: string }): Promise<void> => {
-        try {
-            setLoading(true);
-            setError(null);
-            await surveyRepo.submitSurveyAnswer(surveyId, questionId, answer);
-        } catch (err) {
-            setError(err instanceof Error ? err : new Error('Failed to submit survey answer'));
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    return { startSurvey, submitSurvey, assignSurvey, submitSurveyAnswer, loading, error };
-}
-export function useSurvey(id: string) {
-    const [survey, setSurvey] = useState<ApplicationSurvey | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<Error | null>(null);
-
-    const fetchSurvey = useCallback(async () => {
-        try {
-            setLoading(true);
-            setError(null);
-            const data = await surveyRepo.getSurvey(id);
-            setSurvey(data);
-        } catch (err) {
-            setError(err instanceof Error ? err : new Error('Failed to fetch survey'));
-        } finally {
-            setLoading(false);
-        }
-    }, [id]);
-
-    useEffect(() => {
-        if (id) fetchSurvey();
-    }, [id, fetchSurvey]);
-
-    return { survey, loading, error, refetch: fetchSurvey };
 }

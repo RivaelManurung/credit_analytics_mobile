@@ -9,11 +9,12 @@ import {
 } from '../../gen/reference/v1/reference_pb';
 import { Empty } from '@bufbuild/protobuf';
 import { scrubJson } from '../network/utils';
+import { API_URL } from '@env';
 
 export class ReferenceRepositoryImpl {
     private client = createGrpcClient(ReferenceService);
 
-    private baseUrl = 'https://creditanalyticsbackend-production.up.railway.app';
+    private baseUrl = API_URL;
 
     async listAttributeCategories(): Promise<AttributeCategory[]> {
         try {

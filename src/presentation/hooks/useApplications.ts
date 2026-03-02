@@ -1,57 +1,41 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ApplicationRepositoryImpl } from '../../data/repositories/ApplicationRepositoryImpl';
 import { Application } from '../../gen/application/v1/application_pb';
 
-// In a real app with DI, you might inject this. Here we instantiate it directly for simplicity.
 const repo = new ApplicationRepositoryImpl();
 
+export const applicationKeys = {
+    all: ['applications'] as const,
+    lists: () => [...applicationKeys.all, 'list'] as const,
+    details: () => [...applicationKeys.all, 'detail'] as const,
+    detail: (id: string) => [...applicationKeys.details(), id] as const,
+};
+
 export function useApplications() {
-    const [applications, setApplications] = useState<Application[]>([]);
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-
-    const fetchApplications = useCallback(async () => {
-        setLoading(true);
-        setError(null);
-        try {
-            const data = await repo.listApplications();
-            setApplications(data);
-        } catch (err: any) {
-            setError(err?.message || 'Warning: Failed to load applications.');
-        } finally {
-            setLoading(false);
-        }
-    }, []);
-
-    useEffect(() => {
-        fetchApplications();
-    }, [fetchApplications]);
-
-    return {
-        applications,
-        loading,
-        error,
-        refetch: fetchApplications
-    };
+    return useQuery({
+        queryKey: applicationKeys.lists(),
+        queryFn: () => repo.listApplications(),
+        // Stale time set to 5 mins as apps don't change that often
+        staleTime: 1000 * 60 * 5,
+    });
 }
 
 export function useUpdateApplicationStatus() {
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+    const queryClient = useQueryClient();
 
-    const updateStatus = async (id: string, newStatus: string, reason: string) => {
-        setLoading(true);
-        setError(null);
-        try {
-            const result = await repo.changeApplicationStatus(id, newStatus, reason);
-            return result;
-        } catch (err: any) {
-            setError(err?.message || 'Failed to update application status.');
-            return null;
-        } finally {
-            setLoading(false);
+    const mutation = useMutation({
+        mutationFn: (params: { id: string; newStatus: string; reason: string }) =>
+            repo.changeApplicationStatus(params.id, params.newStatus, params.reason),
+        onSuccess: () => {
+            // Invalidate applications list to show updated status
+            queryClient.invalidateQueries({ queryKey: applicationKeys.all });
         }
-    };
+    });
 
-    return { updateStatus, loading, error };
+    return {
+        updateStatus: (id: string, newStatus: string, reason: string) =>
+            mutation.mutateAsync({ id, newStatus, reason }),
+        loading: mutation.isPending,
+        error: mutation.error?.message || null,
+    };
 }

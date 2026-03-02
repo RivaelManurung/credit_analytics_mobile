@@ -1,141 +1,262 @@
-import React, { useMemo } from 'react';
-import { View, Text, ScrollView, RefreshControl, ActivityIndicator } from 'react-native';
+import React, { useMemo, useCallback } from 'react';
+import { View, Text, ScrollView, RefreshControl, ActivityIndicator, TouchableOpacity, Dimensions } from 'react-native';
 import { SidebarLayout } from '../components/Layout/SidebarLayout';
-import { StatCard } from '../components/Dashboard/StatCard';
-import { ClientCard } from '../components/Dashboard/ClientCard';
-import { User, ClipboardList, CheckCircle, Info } from 'lucide-react-native';
+import { User, ClipboardList, CheckCircle, Info, ChevronRight, Search } from 'lucide-react-native';
 import { useApplications } from '../hooks/useApplications';
-import { useMySurveys, useSurveyControl, useSurveyTemplates } from '../hooks/useSurveys';
-import { ApplicationSurvey } from '../../gen/survey/v1/survey_pb';
+import { useMySurveys, useSurveyControl } from '../hooks/useSurveys';
 import { useAuth } from '../context/AuthContext';
+import { useAppNavigator } from '../context/NavigationContext';
+import { ApplicationMapper } from '../utils/ApplicationMapper';
 
-interface DashboardScreenProps {
-    onStartSurvey: (surveyId: string) => void;
-}
+const { width } = Dimensions.get('window');
 
-// Map status to visual config dynamically
-const getStatusConfig = (status: string) => {
-    const s = status.toUpperCase();
-    if (s.includes('SURVEY')) return { color: '#f59e0b', bg: 'bg-amber-500', border: 'border-amber-500', text: 'text-amber-600' };
-    if (s.includes('INTAKE')) return { color: '#3b82f6', bg: 'bg-blue-500', border: 'border-blue-500', text: 'text-blue-600' };
-    if (s.includes('COMMITTEE')) return { color: '#a855f7', bg: 'bg-purple-500', border: 'border-purple-500', text: 'text-purple-600' };
-    if (s.includes('REJECT')) return { color: '#ef4444', bg: 'bg-red-500', border: 'border-red-500', text: 'text-red-600' };
-    if (s.includes('ANALYSIS')) return { color: '#6366f1', bg: 'bg-indigo-500', border: 'border-indigo-500', text: 'text-indigo-600' };
-    if (s.includes('DONE') || s.includes('VERIFIED')) return { color: '#10b981', bg: 'bg-emerald-500', border: 'border-emerald-500', text: 'text-emerald-600' };
-    return { color: '#64748b', bg: 'bg-slate-500', border: 'border-slate-500', text: 'text-slate-600' };
+const STATUS_CONFIG: Record<string, any> = {
+    // --- Survey Statuses ---
+    IN_PROGRESS: { label: 'Sedang Berjalan', color: '#2563EB', bg: 'bg-blue-50', dot: 'bg-blue-600' },
+    ASSIGNED: { label: 'Ditugaskan', color: '#D97706', bg: 'bg-amber-50', dot: 'bg-amber-600' },
+    START: { label: 'Mulai', color: '#7C3AED', bg: 'bg-purple-50', dot: 'bg-purple-600' },
+    SUBMITTED: { label: 'Dikirim', color: '#059669', bg: 'bg-emerald-50', dot: 'bg-emerald-600' },
+    VERIFIED: { label: 'Terverifikasi', color: '#10B981', bg: 'bg-teal-50', dot: 'bg-teal-600' },
+
+    // --- Application Statuses (Fallback) ---
+    PENDING: { label: 'Menunggu', color: '#6B7280', bg: 'bg-slate-50', dot: 'bg-slate-400' },
+    APPROVED: { label: 'Disetujui', color: '#10B981', bg: 'bg-emerald-50', dot: 'bg-emerald-600' },
+    REJECTED: { label: 'Ditolak', color: '#e11d48', bg: 'bg-rose-50', dot: 'bg-rose-600' },
 };
 
-export function DashboardScreen({ onStartSurvey }: DashboardScreenProps) {
+export function DashboardScreen() {
     const { surveyorId } = useAuth();
-    const { applications, loading: appLoading, error: appError, refetch: refetchApps } = useApplications();
-    const { surveys, loading: surveyLoading, error: surveyError, refetch: refetchSurveys } = useMySurveys(surveyorId || '');
+    const { navigate } = useAppNavigator();
+
+    // Data Fetching
+    const applicationsQuery = useApplications();
+    const surveysQuery = useMySurveys(surveyorId || '');
     const { startSurvey, assignSurvey, loading: actionLoading } = useSurveyControl();
-    const { templates, loading: templatesLoading } = useSurveyTemplates();
 
-    const loading = appLoading || surveyLoading || templatesLoading;
+    // Data Processing
+    const isLoading = applicationsQuery.isLoading || surveysQuery.isLoading;
+    const applications = useMemo(() => applicationsQuery.data || [], [applicationsQuery.data]);
+    const surveys = useMemo(() => surveysQuery.data || [], [surveysQuery.data]);
+    const hasError = !!(applicationsQuery.error || surveysQuery.error);
 
-    // Derived: Group applications by status for better visibility
-    const surveyNeeded = applications.filter(app => app.status === 'SURVEY' || app.status === 'INTAKE');
+    /**
+     * Merge Applications with Survey status.
+     * This makes the dashboard show all customers and their current survey state.
+     */
+    const customerList = useMemo(() => {
+        return applications.map(app => {
+            // Find the most relevant survey for this application
+            const survey = surveys.find(s => s.applicationId === app.id);
+            return {
+                app,
+                survey,
+                display: ApplicationMapper.toDisplay(app)
+            };
+        }).sort((a, b) => {
+            // Priority: In Progress > Start > Assigned > New > Submitted
+            const order: Record<string, number> = {
+                'IN_PROGRESS': 0,
+                'START': 1,
+                'ASSIGNED': 2,
+                'NEW': 3,
+                'SUBMITTED': 4,
+                'VERIFIED': 5
+            };
+            const statusA = a.survey?.status || 'NEW';
+            const statusB = b.survey?.status || 'NEW';
+            return (order[statusA] ?? 99) - (order[statusB] ?? 99);
+        });
+    }, [applications, surveys]);
 
-    const refetch = () => {
-        refetchApps();
-        refetchSurveys();
-    };
+    const stats = useMemo(() => ({
+        total: applications.length,
+        active: surveys.filter(s => ['ASSIGNED', 'IN_PROGRESS', 'START'].includes(s.status)).length,
+        completed: surveys.filter(s => ['SUBMITTED', 'VERIFIED'].includes(s.status)).length,
+    }), [applications, surveys]);
 
-    const handleAction = async (appId: string) => {
-        let existingSurvey: ApplicationSurvey | null = surveys.find(s => s.applicationId === appId) || null;
+    const onRefresh = useCallback(() => {
+        applicationsQuery.refetch();
+        surveysQuery.refetch();
+    }, [applicationsQuery, surveysQuery]);
 
-        if (!existingSurvey) {
-            const activeTemplates = templates.filter(t => t.active);
-            const template = activeTemplates.length > 0 ? activeTemplates[0] : (templates.length > 0 ? templates[0] : null);
+    const handleAction = async (item: any) => {
+        if (!surveyorId) return;
+        const { app, survey } = item;
 
-            if (!template) {
-                const HARDCODED_PERSONAL_TEMPLATE = "0195d1d2-0001-7000-bb34-000000000001";
-                existingSurvey = await assignSurvey(appId, HARDCODED_PERSONAL_TEMPLATE, "FIELD_SURVEY", surveyorId!, "Manual Assignment (System Fallback)");
-            } else {
-                existingSurvey = await assignSurvey(appId, template.id, "FIELD_SURVEY", surveyorId!, `Field Survey (${template.templateName})`);
+        try {
+            let activeSurvey = survey;
+
+            // If no survey exists, create/assign one immediately (Admin behavior)
+            if (!activeSurvey) {
+                activeSurvey = await assignSurvey(
+                    app.id,
+                    '0195c1c2-1234-7000-8888-000000000001', // Example default template ID
+                    'FIELD_SURVEY',
+                    surveyorId,
+                    'Survey Lapangan Langsung'
+                );
             }
-        }
 
-        if (existingSurvey && existingSurvey.id) {
-            await startSurvey(existingSurvey.id, surveyorId!);
-            onStartSurvey(existingSurvey.id);
+            if (activeSurvey.status === 'ASSIGNED') {
+                await startSurvey(activeSurvey.id, surveyorId);
+            }
+
+            navigate('SurveyForm', { surveyId: activeSurvey.id });
+        } catch (err) {
+            console.error('[Dashboard] Action Error:', err);
         }
-        refetch();
     };
 
     return (
-        <SidebarLayout headerTitle="Dashboard Surveyor">
+        <SidebarLayout headerTitle="Dashboard Admin Surveyor">
             <ScrollView
                 className="flex-1 bg-slate-50"
-                contentContainerStyle={{ padding: 24, paddingBottom: 60 }}
-                refreshControl={<RefreshControl refreshing={loading} onRefresh={refetch} tintColor="#3b82f6" />}
+                contentContainerStyle={{ paddingBottom: 100 }}
+                refreshControl={<RefreshControl refreshing={isLoading} onRefresh={onRefresh} tintColor="#2563EB" />}
             >
-                {/* Modern Hero Section */}
-                <View className="mb-8">
-                    <Text className="text-slate-400 text-xs font-bold uppercase tracking-[3px] mb-2">Selamat Datang</Text>
-                    <Text className="text-dark text-4xl font-black leading-tight italic">Survey & Verifikasi</Text>
-                    <View className="h-1.5 w-16 bg-primary mt-2 rounded-full" />
-                </View>
-
-                {/* Quick Status Stats */}
-                <View className="flex-row gap-4 mb-4">
-                    <View className="flex-1 bg-blue-600 p-6 rounded-[32px] shadow-lg shadow-blue-200">
-                        <Text className="text-white/70 text-[10px] font-black uppercase tracking-wider mb-1">Assignment</Text>
-                        <Text className="text-white text-3xl font-black">{applications.length}</Text>
-                        <View className="absolute bottom-4 right-4 bg-white/20 p-2 rounded-full">
-                            <User color="#fff" size={20} />
-                        </View>
-                    </View>
-                    <View className="flex-1 bg-emerald-500 p-6 rounded-[32px] shadow-lg shadow-emerald-200">
-                        <Text className="text-white/70 text-[10px] font-black uppercase tracking-wider mb-1">Selesai</Text>
-                        <Text className="text-white text-3xl font-black">{surveys.filter(s => s.status === 'SUBMITTED' || s.status === 'VERIFIED').length}</Text>
-                        <View className="absolute bottom-4 right-4 bg-white/20 p-2 rounded-full">
-                            <CheckCircle color="#fff" size={20} />
+                {/* Brand Header */}
+                <View className="bg-white px-6 pt-4 pb-6 border-b border-slate-100 mb-6">
+                    <View className="flex-row justify-between items-center">
+                        <View>
+                            <Text className="text-slate-400 text-[10px] font-bold uppercase tracking-[3px] mb-1">Internal App</Text>
+                            <Text className="text-dark text-2xl font-black italic">Survey Portal</Text>
                         </View>
                     </View>
                 </View>
 
-                {(appError || surveyError) && (
-                    <View className="bg-rose-50 p-4 rounded-2xl mb-6 border border-rose-100 flex-row items-center">
-                        <Info color="#e11d48" size={20} />
-                        <Text className="text-rose-600 font-bold text-xs ml-3">Sinkronisasi data tertunda. Cek koneksi Anda.</Text>
+                <View className="px-6">
+                    {/* Stat Cards */}
+                    <View className="flex-row gap-3 mb-8">
+                        <PremiumStatCard label="Total Nasabah" value={stats.total} accentColor="#64748B" />
+                        <PremiumStatCard label="Survey Aktif" value={stats.active} accentColor="#2563EB" />
+                        <PremiumStatCard label="Selesai" value={stats.completed} accentColor="#059669" />
                     </View>
-                )}
 
-                <View className="flex-row items-center justify-between mb-6">
-                    <View>
-                        <Text className="text-dark text-xl font-black">List Nasabah</Text>
-                        <Text className="text-slate-400 font-medium text-xs">Ketuk kartu untuk memulai survey</Text>
+                    {/* Section Header */}
+                    <View className="flex-row justify-between items-center mb-5">
+                        <View>
+                            <Text className="text-dark text-xl font-black">List Nasabah</Text>
+                            <Text className="text-slate-400 font-bold text-[10px] mt-0.5 uppercase tracking-wider">Database Calon Nasabah</Text>
+                        </View>
+                        <Search color="#94A3B8" size={20} />
                     </View>
-                    {actionLoading && <ActivityIndicator size="small" color="#3b82f6" />}
+
+                    {/* Connectivity Error Warning */}
+                    {hasError && <ErrorAlert message={applicationsQuery.error?.message || surveysQuery.error?.message} />}
+
+                    {/* Customer List Rendering */}
+                    {customerList.length === 0 && !isLoading ? (
+                        <View className="bg-white p-12 rounded-3xl items-center border border-slate-100 mt-2">
+                            <ClipboardList color="#E2E8F0" size={56} />
+                            <Text className="text-slate-400 mt-5 text-center font-bold text-xs">Database Nasabah Kosong</Text>
+                        </View>
+                    ) : (
+                        customerList.map((item) => (
+                            <PremiumCustomerCard
+                                key={item.app.id}
+                                item={item}
+                                onAction={() => handleAction(item)}
+                            />
+                        ))
+                    )}
                 </View>
 
-                {applications.length === 0 && !loading && (
-                    <View className="bg-white p-12 rounded-[40px] items-center shadow-sm border border-slate-100 mt-4">
-                        <ClipboardList color="#E2E8F0" size={80} />
-                        <Text className="text-slate-500 mt-6 text-center font-bold text-xl">Kotak Masuk Kosong</Text>
-                        <Text className="text-slate-400 text-xs text-center mt-2 leading-5">Belum ada penugasan baru untuk wilayah Anda hari ini.</Text>
+                {actionLoading && (
+                    <View className="mt-6 items-center">
+                        <ActivityIndicator size="small" color="#2563EB" />
+                        <Text className="text-[10px] text-slate-400 font-bold mt-2 uppercase tracking-widest">Memproses...</Text>
                     </View>
                 )}
-
-                {applications.map((app) => {
-                    const survey = surveys.find(s => s.applicationId === app.id);
-                    const isUrgent = app.status === 'SURVEY';
-                    return (
-                        <ClientCard
-                            key={app.id}
-                            name={app.applicantName || 'Nasabah #' + app.id.substring(0, 5)}
-                            status={app.status || 'PENDING'}
-                            activeStatus={survey ? survey.status : 'PENDING'}
-                            idApp={app.id.substring(0, 8)}
-                            amount={app.loanAmount ? `Rp ${Number(app.loanAmount).toLocaleString('id-ID')}` : '-'}
-                            address={survey?.surveyPurpose || 'Menunggu verifikasi lapangan'}
-                            onPressStart={() => handleAction(app.id)}
-                        />
-                    );
-                })}
             </ScrollView>
         </SidebarLayout>
+    );
+}
+
+// ─── Internal Components ───────────────────────────────────────────────────
+
+function PremiumStatCard({ label, value, accentColor }: { label: string, value: number, accentColor: string }) {
+    return (
+        <View className="flex-1 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex-col gap-2">
+            <View className="w-5 h-1 rounded-full" style={{ backgroundColor: accentColor }} />
+            <View>
+                <Text className="text-2xl font-black text-dark leading-7">{value}</Text>
+                <Text className="text-[9px] text-slate-400 font-bold uppercase tracking-tight mt-1">{label}</Text>
+            </View>
+        </View>
+    );
+}
+
+function PremiumCustomerCard({ item, onAction }: { item: any, onAction: () => void }) {
+    const { app, survey, display } = item;
+    const statusKey = survey?.status || display.status || 'PENDING';
+    const config = STATUS_CONFIG[statusKey] || {
+        label: statusKey,
+        color: '#6B7280',
+        bg: 'bg-slate-50',
+        dot: 'bg-slate-400'
+    };
+    const isCompleted = ['SUBMITTED', 'VERIFIED'].includes(statusKey);
+
+    return (
+        <View className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 mb-3">
+            <View className="flex-row justify-between items-start mb-4">
+                <View className="flex-row items-center flex-1 pr-2">
+                    <View className="w-10 h-10 rounded-xl bg-slate-50 items-center justify-center border border-slate-100">
+                        <Text className="text-slate-600 font-black text-base">{display.applicantName.charAt(0)}</Text>
+                    </View>
+                    <View className="ml-3 flex-1">
+                        <Text className="text-dark font-bold text-[14px]" numberOfLines={1}>{display.applicantName}</Text>
+                        <Text className="text-slate-400 font-medium text-[10px] tracking-wider mt-0.5 uppercase">
+                            #{display.displayId}
+                        </Text>
+                    </View>
+                </View>
+                <View className={`flex-row items-center px-2.5 py-1 rounded-full ${config.bg}`}>
+                    <View className={`w-1.5 h-1.5 rounded-full ${config.dot} mr-2`} />
+                    <Text className="text-[10px] font-black tracking-tight uppercase" style={{ color: config.color }}>
+                        {config.label}
+                    </Text>
+                </View>
+            </View>
+
+            <View className="mb-4 bg-slate-50/50 p-3 rounded-xl border border-slate-100">
+                <View>
+                    <Text className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">Plafon Diajukan</Text>
+                    <Text className="text-dark font-black text-[12px] mt-0.5">{display.amount}</Text>
+                </View>
+            </View>
+
+            {!isCompleted ? (
+                <TouchableOpacity
+                    onPress={onAction}
+                    className="w-full py-3.5 rounded-xl items-center shadow-lg shadow-blue-100"
+                    style={{ backgroundColor: config.color === '#6B7280' ? '#2563EB' : config.color }}
+                >
+                    <Text className="text-white font-black text-[11px] uppercase tracking-widest">
+                        {statusKey === 'IN_PROGRESS' ? 'Lanjutkan Survey →' :
+                            !survey ? 'Mulai Survey →' :
+                                statusKey === 'ASSIGNED' ? 'Terima & Mulai →' : 'Buka Survey →'}
+                    </Text>
+                </TouchableOpacity>
+            ) : (
+                <View className="bg-emerald-50 py-3 rounded-xl items-center border border-emerald-100">
+                    <View className="flex-row items-center">
+                        <CheckCircle size={14} color="#059669" />
+                        <Text className="text-emerald-600 font-black text-[11px] uppercase tracking-widest ml-2">Survey Selesai</Text>
+                    </View>
+                </View>
+            )}
+        </View>
+    );
+}
+
+function ErrorAlert({ message }: { message?: string }) {
+    return (
+        <View className="bg-rose-50 p-4 rounded-2xl mb-4 border border-rose-100 flex-row items-center">
+            <Info color="#e11d48" size={16} />
+            <Text className="text-rose-600 font-bold text-[10px] ml-2 flex-1">
+                Koneksi Bermasalah: {message || 'Data mungkin tidak akurat'}
+            </Text>
+        </View>
     );
 }

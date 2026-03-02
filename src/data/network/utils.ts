@@ -9,6 +9,7 @@ export function scrubJson(data: any): any {
     const scrubbed = { ...data } as any;
     for (const key in scrubbed) {
         const val = scrubbed[key];
+        // Remove empty dates or empty strings
         if (typeof val === 'string' && (val.startsWith('0001-01-01') || val === '')) {
             delete scrubbed[key]; // Let Protobuf use default/empty value
         } else if (typeof val === 'object' && val !== null) {

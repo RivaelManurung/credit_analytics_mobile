@@ -2,69 +2,45 @@ import { createGrpcClient } from '../network/grpcClient';
 import { ApplicationService } from '../../gen/application/v1/application_connect';
 import { ListApplicationsRequest, Application } from '../../gen/application/v1/application_pb';
 import { scrubJson } from '../network/utils';
+import { API_URL } from '@env';
 
 export class ApplicationRepositoryImpl {
     private client = createGrpcClient(ApplicationService);
+    private baseUrl = API_URL;
 
     async listApplications(): Promise<Application[]> {
         try {
-            console.log('[gRPC] LIST Applications requested');
-
-            // Testing REST connectivity as we did for surveys
-            const url = `https://creditanalyticsbackend-production.up.railway.app/v1/applications`;
-            console.log(`[DEBUG] Testing REST Applications: ${url}`);
-
-            try {
-                const response = await this.client.listApplications(new ListApplicationsRequest({
-                    pageSize: 20
-                }));
-                return response.applications;
-            } catch (grpcErr) {
-                console.warn('[gRPC ERROR] Falling back to REST for Applications:', grpcErr);
-
-                // Fallback to REST because we confirmed it works in production
-                const res = await fetch(url);
-                if (res.ok) {
-                    const data = await res.json();
-                    console.log('[DEBUG] REST Applications Success');
-                    // Map REST JSON to Proto objects using constructor for more resilience
-                    return (data.applications || []).map((app: any) => new Application(scrubJson(app)));
-                }
-                console.error(`[REST ERROR] LIST Applications failed: ${res.status}`);
-                throw grpcErr;
-            }
+            const response = await this.client.listApplications(new ListApplicationsRequest({ pageSize: 50 }));
+            return response.applications;
         } catch (error) {
-            console.error('[gRPC/REST ERROR] LIST Applications:', error);
+            const res = await fetch(`${this.baseUrl}/v1/applications`);
+            if (res.ok) {
+                const data = await res.json();
+                return (data.applications || []).map((app: any) => {
+                    // If backend sends identity_number at root but it's not in attributes,
+                    // move it to attributes so Application.fromJson (which follows Protobuf) doesn't drop it.
+                    if (app.identity_number && !app.attributes?.some((a: any) => a.attribute_id === 'identity_number')) {
+                        app.attributes = [...(app.attributes || []), { attribute_id: 'identity_number', value: String(app.identity_number) }];
+                    }
+                    return Application.fromJson(scrubJson(app), { ignoreUnknownFields: true });
+                });
+            }
             throw error;
         }
     }
 
     async changeApplicationStatus(id: string, newStatus: string, reason: string): Promise<Application> {
         try {
-            console.log(`[gRPC] CHANGE Status requested: ${id} -> ${newStatus}`);
-            // Use ChangeApplicationStatusRequest message
             const { ChangeApplicationStatusRequest } = await import('../../gen/application/v1/application_pb');
-            const response = await this.client.changeApplicationStatus(new ChangeApplicationStatusRequest({
-                id,
-                newStatus,
-                reason
-            }));
-            return response;
-        } catch (grpcErr) {
-            console.warn('[gRPC ERROR] Falling back to REST for Change Status:', grpcErr);
-            const url = `https://creditanalyticsbackend-production.up.railway.app/v1/applications/${id}/status`;
-            const res = await fetch(url, {
+            return await this.client.changeApplicationStatus(new ChangeApplicationStatusRequest({ id, newStatus, reason }));
+        } catch (error) {
+            const res = await fetch(`${this.baseUrl}/v1/applications/${id}/status`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    new_status: newStatus,
-                    reason: reason
-                })
+                body: JSON.stringify({ new_status: newStatus, reason })
             });
-            if (res.ok) {
-                return new Application(scrubJson(await res.json()));
-            }
-            throw grpcErr;
+            if (res.ok) return new Application(scrubJson(await res.json()));
+            throw error;
         }
     }
 }
