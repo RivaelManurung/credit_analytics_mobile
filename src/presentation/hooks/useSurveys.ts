@@ -38,6 +38,7 @@ export function useSurvey(id: string) {
         queryKey: surveyKeys.detail(id),
         queryFn: () => surveyRepo.getSurvey(id),
         enabled: !!id,
+        staleTime: 30_000, // 30s — prevents refetch immediately after startSurvey invalidation
     });
 }
 
@@ -54,8 +55,31 @@ export function useSurveySections(templateId: string) {
         queryKey: surveyKeys.sections(templateId),
         queryFn: () => surveyRepo.listSurveySections(templateId),
         enabled: !!templateId,
+        staleTime: 60_000, // 60s — sections don't change often
     });
 }
+
+// Combined hook — fetches survey + sections in ONE query using parallel Promise.all
+// templateId is passed explicitly to bypass the getSurvey templateId mapping bug
+export function useSurveyFormData(surveyId: string, templateId: string) {
+    return useQuery({
+        queryKey: ['surveyForm', surveyId, templateId],
+        enabled: !!surveyId && !!templateId,
+        staleTime: 30_000,
+        retry: 1,
+        queryFn: async () => {
+            console.log(`[useSurveyFormData] Fetching: surveyId=${surveyId} templateId=${templateId}`);
+            // Parallel fetch — much faster, no cascade!
+            const [survey, sections] = await Promise.all([
+                surveyRepo.getSurvey(surveyId),
+                surveyRepo.listSurveySections(templateId),
+            ]);
+            console.log(`[useSurveyFormData] Done: survey=${survey.id}, sections=${sections.length}`);
+            return { survey, sections };
+        },
+    });
+}
+
 
 export function useSurveyControl() {
     const queryClient = useQueryClient();
@@ -64,7 +88,12 @@ export function useSurveyControl() {
         mutationFn: ({ id, userId }: { id: string; userId: string }) =>
             surveyRepo.startSurvey(id, userId),
         onSuccess: (data) => {
-            if (data) queryClient.invalidateQueries({ queryKey: surveyKeys.all });
+            // Only invalidate lists, NOT the detail — so SurveyFormScreen doesn't reset
+            if (data) {
+                queryClient.invalidateQueries({ queryKey: surveyKeys.lists() });
+                // Update the cache for this specific survey directly
+                queryClient.setQueryData(surveyKeys.detail(data.id), data);
+            }
         }
     });
 
@@ -72,7 +101,10 @@ export function useSurveyControl() {
         mutationFn: ({ id, userId }: { id: string; userId: string }) =>
             surveyRepo.submitSurvey(id, userId),
         onSuccess: (data) => {
-            if (data) queryClient.invalidateQueries({ queryKey: surveyKeys.all });
+            if (data) {
+                queryClient.invalidateQueries({ queryKey: surveyKeys.lists() });
+                queryClient.setQueryData(surveyKeys.detail(data.id), data);
+            }
         }
     });
 
@@ -80,7 +112,7 @@ export function useSurveyControl() {
         mutationFn: (params: { applicationId: string, templateId: string, surveyType: string, assignedTo: string, surveyPurpose: string }) =>
             surveyRepo.assignSurvey(params.applicationId, params.templateId, params.surveyType, params.assignedTo, params.surveyPurpose),
         onSuccess: (data) => {
-            if (data) queryClient.invalidateQueries({ queryKey: surveyKeys.all });
+            if (data) queryClient.invalidateQueries({ queryKey: surveyKeys.lists() });
         }
     });
 

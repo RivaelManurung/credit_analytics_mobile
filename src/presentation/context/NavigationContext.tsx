@@ -16,13 +16,13 @@ export function NavigationProvider({ children }: { children: React.ReactNode }) 
     const [params, setParams] = useState<any>(null);
     const [history, setHistory] = useState<ScreenName[]>(['Dashboard']);
 
-    const navigate = (screen: ScreenName, screenParams?: any) => {
+    const navigate = React.useCallback((screen: ScreenName, screenParams?: any) => {
         setParams(screenParams);
         setCurrentScreen(screen);
         setHistory(prev => [...prev, screen]);
-    };
+    }, []);
 
-    const goBack = () => {
+    const goBack = React.useCallback(() => {
         if (history.length > 1) {
             const newHistory = [...history];
             newHistory.pop(); // remove current
@@ -32,10 +32,17 @@ export function NavigationProvider({ children }: { children: React.ReactNode }) 
             return true;
         }
         return false; // Exit app
-    };
+    }, [history]);
+
+    const value = React.useMemo(() => ({
+        currentScreen,
+        params,
+        navigate,
+        goBack
+    }), [currentScreen, params, navigate, goBack]);
 
     return (
-        <NavigationContext.Provider value={{ currentScreen, params, navigate, goBack }}>
+        <NavigationContext.Provider value={value}>
             {children}
         </NavigationContext.Provider>
     );

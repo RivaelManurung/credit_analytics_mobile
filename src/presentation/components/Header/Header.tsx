@@ -13,14 +13,18 @@ export function Header({ title, onMenuPress }: HeaderProps) {
 
     return (
         <View
-            className="bg-primary flex-row items-center justify-between pb-4 px-4 shadow-md"
-            style={{ paddingTop: insets.top }}
+            className="bg-primary flex-row items-center justify-between py-4 px-5 border-b border-primary/20"
+            style={{ paddingTop: insets.top + 8 }}
         >
-            <TouchableOpacity onPress={onMenuPress} className="p-1 w-10">
-                <Menu color="#fff" size={24} />
+            <TouchableOpacity
+                onPress={onMenuPress}
+                activeOpacity={0.7}
+                className="w-10 h-10 items-center justify-center bg-white/10 rounded-xl"
+            >
+                <Menu color="#fff" size={22} strokeWidth={2.5} />
             </TouchableOpacity>
 
-            <Text className="text-white text-lg font-bold">{title}</Text>
+            <Text className="text-white text-[17px] font-black tracking-tight">{title}</Text>
 
             {/* Invisible view to balance flex layout */}
             <View className="w-10" />

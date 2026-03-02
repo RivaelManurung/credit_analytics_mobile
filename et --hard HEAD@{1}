@@ -1,0 +1,14 @@
+[33m3ed4637[m[33m ([m[1;36mHEAD -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m)[m HEAD@{0}: reset: moving to 3ed4637
+[33m4bc9af5[m HEAD@{1}: commit (merge): rivael
+[33m3ed4637[m[33m ([m[1;36mHEAD -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m)[m HEAD@{2}: checkout: moving from main to main
+[33m3ed4637[m[33m ([m[1;36mHEAD -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m)[m HEAD@{3}: commit: update
+[33meac7a65[m HEAD@{4}: commit: Bypass login screen with auto login setup
+[33mba837c5[m HEAD@{5}: commit: Remove mocked surveyor ID and introduce AuthContext & LoginScreen
+[33mdc0a431[m HEAD@{6}: commit: Implement assignSurvey fallback to create missing surveys before start
+[33m79290b1[m HEAD@{7}: commit: Revert client card visual state to track survey independently of app status
+[33mf57adcf[m HEAD@{8}: commit: Fix JSON parse from REST responses
+[33mcf987ba[m HEAD@{9}: commit: Fix status displayed in ClientCard
+[33mac9bb83[m[33m ([m[1;32mfebiola-develop[m[33m)[m HEAD@{10}: merge febiola-develop: Fast-forward
+[33mb647537[m[33m ([m[1;31morigin/febiola-develop[m[33m, [m[1;31morigin/HEAD[m[33m)[m HEAD@{11}: checkout: moving from febiola-develop to main
+[33mac9bb83[m[33m ([m[1;32mfebiola-develop[m[33m)[m HEAD@{12}: commit: Update gRPC methods to PUT instead of POST for status changes
+[33mb647537[m[33m ([m[1;31morigin/febiola-develop[m[33m, [m[1;31morigin/HEAD[m[33m)[m HEAD@{13}: clone: from https://github.com/RivaelManurung/credit_analytics_mobile.git

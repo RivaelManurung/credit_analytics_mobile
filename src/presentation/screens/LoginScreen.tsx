@@ -20,19 +20,19 @@ export function LoginScreen() {
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                 className="flex-1 justify-center px-8"
             >
-                <View className="items-center mb-10">
-                    <View className="bg-blue-100 p-4 rounded-full mb-6">
-                        <ShieldCheck color="#0b78ed" size={60} />
+                <View className="items-center mb-12">
+                    <View className="bg-blue-50 p-6 rounded-[32px] mb-8 border border-blue-100">
+                        <ShieldCheck color="#3b82f6" size={56} strokeWidth={2.5} />
                     </View>
-                    <Text className="text-3xl font-bold text-dark text-center">Petugas Survei</Text>
-                    <Text className="text-secondary text-base text-center mt-2">Silakan masuk dengan ID Surveyor Anda untuk mulai bekerja.</Text>
+                    <Text className="text-4xl font-black text-dark text-center tracking-tight">Survey <Text className="text-primary italic">Portal</Text></Text>
+                    <Text className="text-secondary text-sm text-center mt-3 font-medium px-4 leading-5">Silakan masuk dengan ID Surveyor Anda untuk mulai bekerja pada sistem internal.</Text>
                 </View>
 
-                <View className="bg-white p-6 rounded-2xl shadow-sm border border-slate-50">
-                    <Text className="text-dark font-semibold mb-2">ID Surveyor</Text>
+                <View className="bg-white p-8 rounded-[40px] border border-slate-100 shadow-sm">
+                    <Text className="text-dark font-black text-[10px] uppercase tracking-widest mb-3 ml-1">ID Surveyor</Text>
                     <TextInput
-                        className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 mb-6 text-dark"
-                        placeholder="Contoh: 0195c1c2-xxx"
+                        className="bg-slate-50 border border-slate-100 rounded-[20px] px-5 py-4 mb-8 text-dark font-bold"
+                        placeholder="0195c1c2-xxxx..."
                         placeholderTextColor="#94a3b8"
                         value={idInput}
                         onChangeText={setIdInput}
@@ -41,10 +41,20 @@ export function LoginScreen() {
                     />
 
                     <TouchableOpacity
-                        className="bg-primary py-4 rounded-xl items-center"
+                        className="bg-primary py-4 rounded-[20px] items-center"
                         onPress={handleLogin}
+                        activeOpacity={0.8}
+                        style={{
+                            shadowColor: '#3b82f6',
+                            shadowOffset: { width: 0, height: 4 },
+                            shadowOpacity: 0.2,
+                            shadowRadius: 10,
+                            elevation: 4
+                        }}
                     >
-                        <Text className="text-white font-bold text-lg">Masuk</Text>
+                        <View className="flex-row items-center">
+                            <Text className="text-white font-black text-[13px] uppercase tracking-[3px]">Masuk Sekarang</Text>
+                        </View>
                     </TouchableOpacity>
                 </View>
             </KeyboardAvoidingView>

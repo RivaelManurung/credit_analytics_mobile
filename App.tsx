@@ -34,23 +34,19 @@ function App() {
 function AppContent() {
   const { surveyorId } = useAuth();
   const { currentScreen, params, navigate, goBack } = useAppNavigator();
+  const handleNavigateDashboard = React.useCallback(() => navigate('Dashboard'), [navigate]);
 
   // Handle Hardware Back Button Globally
   useEffect(() => {
     const onBackPress = () => {
       // Return true to stop propagation, false to allow default (exit)
-      const handled = goBack();
-      return handled;
+      return goBack();
     };
 
     const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
 
     return () => {
-      if (subscription && typeof subscription.remove === 'function') {
-        subscription.remove();
-      } else if (typeof (BackHandler as any).removeEventListener === 'function') {
-        (BackHandler as any).removeEventListener('hardwareBackPress', onBackPress);
-      }
+      subscription.remove();
     };
   }, [goBack]);
 
@@ -71,10 +67,11 @@ function AppContent() {
         <ApplicationListScreen />
       )}
 
-      {currentScreen === 'SurveyForm' && (
+      {currentScreen === 'SurveyForm' && params?.surveyId && (
         <SurveyFormScreen
-          surveyId={params?.surveyId}
-          onBack={() => navigate('Dashboard')}
+          surveyId={params.surveyId}
+          templateId={params.templateId || ''}
+          onBack={handleNavigateDashboard}
         />
       )}
     </View>
