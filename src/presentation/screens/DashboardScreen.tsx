@@ -12,16 +12,16 @@ const { width } = Dimensions.get('window');
 
 const STATUS_CONFIG: Record<string, any> = {
     // --- Survey Statuses ---
-    IN_PROGRESS: { label: 'In Progress', color: '#3b82f6', bg: 'bg-blue-50', dot: 'bg-blue-400' },
-    ASSIGNED: { label: 'Assigned', color: '#f97316', bg: 'bg-orange-50/80', dot: 'bg-orange-400' },
-    START: { label: 'Ready', color: '#a855f7', bg: 'bg-purple-50', dot: 'bg-purple-400' },
-    SUBMITTED: { label: 'Submitted', color: '#10b981', bg: 'bg-emerald-50', dot: 'bg-emerald-400' },
-    VERIFIED: { label: 'Verified', color: '#14b8a6', bg: 'bg-teal-50', dot: 'bg-teal-400' },
+    IN_PROGRESS: { label: 'Sedang Berjalan', color: '#2563EB', bg: 'bg-blue-50', dot: 'bg-blue-600' },
+    ASSIGNED: { label: 'Ditugaskan', color: '#D97706', bg: 'bg-amber-50', dot: 'bg-amber-600' },
+    START: { label: 'Mulai', color: '#7C3AED', bg: 'bg-purple-50', dot: 'bg-purple-600' },
+    SUBMITTED: { label: 'Dikirim', color: '#059669', bg: 'bg-emerald-50', dot: 'bg-emerald-600' },
+    VERIFIED: { label: 'Terverifikasi', color: '#10B981', bg: 'bg-teal-50', dot: 'bg-teal-600' },
 
-    // --- Application Statuses ---
-    PENDING: { label: 'Pending', color: '#94a3b8', bg: 'bg-slate-50', dot: 'bg-slate-300' },
-    APPROVED: { label: 'Approved', color: '#10b981', bg: 'bg-emerald-50', dot: 'bg-emerald-400' },
-    REJECTED: { label: 'Rejected', color: '#ef4444', bg: 'bg-rose-50', dot: 'bg-rose-400' },
+    // --- Application Statuses (Fallback) ---
+    PENDING: { label: 'Menunggu', color: '#6B7280', bg: 'bg-slate-50', dot: 'bg-slate-400' },
+    APPROVED: { label: 'Disetujui', color: '#10B981', bg: 'bg-emerald-50', dot: 'bg-emerald-600' },
+    REJECTED: { label: 'Ditolak', color: '#e11d48', bg: 'bg-rose-50', dot: 'bg-rose-600' },
 };
 
 export function DashboardScreen() {
@@ -39,13 +39,9 @@ export function DashboardScreen() {
     const surveys = useMemo(() => surveysQuery.data || [], [surveysQuery.data]);
     const hasError = !!(applicationsQuery.error || surveysQuery.error);
 
-    /**
-     * Merge Applications with Survey status.
-     * This makes the dashboard show all customers and their current survey state.
-     */
+    // Customer list — merge applications + surveys, sorted by survey status
     const customerList = useMemo(() => {
         return applications.map(app => {
-            // Find the most relevant survey for this application
             const survey = surveys.find(s => s.applicationId === app.id);
             return {
                 app,
@@ -53,7 +49,7 @@ export function DashboardScreen() {
                 display: ApplicationMapper.toDisplay(app)
             };
         }).sort((a, b) => {
-            // Priority: In Progress > Start > Assigned > New > Submitted
+            // Sort order by survey status
             const order: Record<string, number> = {
                 'IN_PROGRESS': 0,
                 'START': 1,
@@ -70,7 +66,7 @@ export function DashboardScreen() {
 
     const stats = useMemo(() => ({
         total: applications.length,
-        active: surveys.filter(s => ['ASSIGNED', 'IN_PROGRESS', 'START'].includes(s.status)).length,
+        active: surveys.filter(s => s.status === 'IN_PROGRESS').length,
         completed: surveys.filter(s => ['SUBMITTED', 'VERIFIED'].includes(s.status)).length,
     }), [applications, surveys]);
 
@@ -82,14 +78,12 @@ export function DashboardScreen() {
     const handleAction = async (item: any) => {
         if (!surveyorId) return;
         const { app, survey } = item;
-
-        // The default template ID we always use
         const DEFAULT_TEMPLATE_ID = '0195d1d2-0001-7000-bb34-000000000001';
 
         try {
             let activeSurvey = survey;
 
-            // If no survey exists, create/assign one immediately
+            // Assign new survey if none exists
             if (!activeSurvey) {
                 activeSurvey = await assignSurvey(
                     app.id,
@@ -104,58 +98,51 @@ export function DashboardScreen() {
                 await startSurvey(activeSurvey.id, surveyorId);
             }
 
-            // ALWAYS use DEFAULT_TEMPLATE_ID — the backend has a bug where
-            // getSurvey returns applicationId in the templateId field.
-            console.log(`[Dashboard] → SurveyForm: surveyId=${activeSurvey.id}`);
-            navigate('SurveyForm', { surveyId: activeSurvey.id, templateId: DEFAULT_TEMPLATE_ID });
+            navigate('SurveyForm', {
+                surveyId: activeSurvey.id,
+                applicationId: app.id,
+            });
         } catch (err) {
             console.error('[Dashboard] Action Error:', err);
         }
     };
 
     return (
-        <SidebarLayout headerTitle="Dashboard Surveyor">
+        <SidebarLayout headerTitle="Dashboard Credit Analyst">
             <ScrollView
-                className="flex-1 bg-white"
+                className="flex-1 bg-slate-50"
                 contentContainerStyle={{ paddingBottom: 100 }}
-                refreshControl={<RefreshControl refreshing={isLoading} onRefresh={onRefresh} tintColor="#2563eb" />}
+                refreshControl={<RefreshControl refreshing={isLoading} onRefresh={onRefresh} tintColor="#2563EB" />}
             >
                 {/* Brand Header */}
-                <View className="bg-white px-6 py-6 border-b border-light mb-4">
+                <View className="bg-white px-6 pt-4 pb-6 border-b border-slate-100 mb-6">
                     <View className="flex-row justify-between items-center">
                         <View>
-                            <Text className="text-secondary text-[10px] font-bold uppercase tracking-[2px] mb-0.5">INTERNAL SYSTEM</Text>
-                            <Text className="text-dark text-3xl font-black">Survey <Text className="text-primary">Portal</Text></Text>
+                            <Text className="text-slate-400 text-[10px] font-bold uppercase tracking-[3px] mb-1">Credit Survey Management</Text>
+                            <Text className="text-dark text-2xl font-black italic">Survey Nasabah</Text>
                         </View>
                     </View>
                 </View>
 
                 <View className="px-6">
                     {/* Stat Cards */}
-                    <View className="flex-row gap-3 mb-6">
-                        <PremiumStatCard label="Survey Aktif" value={stats.active} accentColor="#2563eb" />
+                    <View className="flex-row gap-3 mb-8">
+                        <PremiumStatCard label="Total Nasabah" value={stats.total} accentColor="#64748B" />
+                        <PremiumStatCard label="Survey Aktif" value={stats.active} accentColor="#2563EB" />
                         <PremiumStatCard label="Selesai" value={stats.completed} accentColor="#059669" />
-                        <PremiumStatCard label="Total" value={stats.total} accentColor="#94a3b8" />
                     </View>
 
                     {/* Section Header */}
-                    <View className="flex-row justify-between items-end mb-4 pr-1">
+                    <View className="flex-row justify-between items-center mb-5">
                         <View>
-                            <Text className="text-dark text-xl font-extrabold">List Nasabah</Text>
-                            <Text className="text-secondary font-semibold text-[10px] mt-1 uppercase tracking-wider">Database Surveyor</Text>
+                            <Text className="text-dark text-xl font-black">List Nasabah</Text>
+                            <Text className="text-slate-400 font-bold text-[10px] mt-0.5 uppercase tracking-wider">Calon Nasabah</Text>
                         </View>
-                        <TouchableOpacity className="bg-white p-2.5 rounded-xl shadow-sm border border-light">
-                            <Search color="#64748B" size={18} />
-                        </TouchableOpacity>
+                        <Search color="#94A3B8" size={20} />
                     </View>
 
-                    {/* Connectivity Notice (Subtle) */}
-                    {hasError && (
-                        <View className="mb-4 flex-row items-center px-4 py-2 bg-slate-50 rounded-xl border border-light">
-                            <View className="w-1.5 h-1.5 rounded-full bg-slate-400 mr-3" />
-                            <Text className="text-secondary text-[10px] font-bold uppercase tracking-wider">Sync in progress • Data is offline</Text>
-                        </View>
-                    )}
+                    {/* Connectivity Error Warning */}
+                    {hasError && <ErrorAlert message={applicationsQuery.error?.message || surveysQuery.error?.message} />}
 
                     {/* Customer List Rendering */}
                     {customerList.length === 0 && !isLoading ? (
@@ -189,11 +176,11 @@ export function DashboardScreen() {
 
 function PremiumStatCard({ label, value, accentColor }: { label: string, value: number, accentColor: string }) {
     return (
-        <View className="flex-1 bg-white p-4 rounded-3xl border border-light shadow-sm flex-col gap-1.5">
-            <View className="w-6 h-1 rounded-full" style={{ backgroundColor: accentColor }} />
+        <View className="flex-1 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex-col gap-2">
+            <View className="w-5 h-1 rounded-full" style={{ backgroundColor: accentColor }} />
             <View>
-                <Text className="text-2xl font-black text-dark tracking-tight">{value}</Text>
-                <Text className="text-[9px] text-secondary font-extrabold uppercase tracking-tight mt-0.5" numberOfLines={1}>{label}</Text>
+                <Text className="text-2xl font-black text-dark leading-7">{value}</Text>
+                <Text className="text-[9px] text-slate-400 font-bold uppercase tracking-tight mt-1">{label}</Text>
             </View>
         </View>
     );
@@ -204,72 +191,58 @@ function PremiumCustomerCard({ item, onAction }: { item: any, onAction: () => vo
     const statusKey = survey?.status || display.status || 'PENDING';
     const config = STATUS_CONFIG[statusKey] || {
         label: statusKey,
-        color: '#64748B',
+        color: '#6B7280',
         bg: 'bg-slate-50',
         dot: 'bg-slate-400'
     };
     const isCompleted = ['SUBMITTED', 'VERIFIED'].includes(statusKey);
 
     return (
-        <View className="bg-white rounded-[28px] border border-light shadow-sm p-5 mb-4">
-            <View className="flex-row justify-between items-start mb-6">
+        <View className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 mb-3">
+            <View className="flex-row justify-between items-start mb-4">
                 <View className="flex-row items-center flex-1 pr-2">
-                    <View className="w-12 h-12 rounded-2xl bg-slate-50 items-center justify-center border border-light">
-                        <Text className="text-dark font-black text-lg">{display.applicantName.charAt(0)}</Text>
+                    <View className="w-10 h-10 rounded-xl bg-slate-50 items-center justify-center border border-slate-100">
+                        <Text className="text-slate-600 font-black text-base">{display.applicantName.charAt(0)}</Text>
                     </View>
-                    <View className="ml-3.5 flex-1">
-                        <Text className="text-dark font-black text-[15px]" numberOfLines={1}>{display.applicantName}</Text>
-                        <Text className="text-secondary font-bold text-[10px] tracking-wider mt-0.5 uppercase">
-                            ID • {display.displayId.split('-').pop()}
+                    <View className="ml-3 flex-1">
+                        <Text className="text-dark font-bold text-[14px]" numberOfLines={1}>{display.applicantName}</Text>
+                        <Text className="text-slate-400 font-medium text-[10px] tracking-wider mt-0.5 uppercase">
+                            #{display.displayId}
                         </Text>
                     </View>
                 </View>
-                <View className={`flex-row items-center px-3 py-1.5 rounded-full ${config.bg}`}>
+                <View className={`flex-row items-center px-2.5 py-1 rounded-full ${config.bg}`}>
                     <View className={`w-1.5 h-1.5 rounded-full ${config.dot} mr-2`} />
-                    <Text className="text-[9px] font-black tracking-widest uppercase" style={{ color: config.color }}>
+                    <Text className="text-[10px] font-black tracking-tight uppercase" style={{ color: config.color }}>
                         {config.label}
                     </Text>
                 </View>
             </View>
 
-            <View className="flex-row justify-between items-center mb-6 px-1">
+            <View className="mb-4 bg-slate-50/50 p-3 rounded-xl border border-slate-100">
                 <View>
-                    <Text className="text-[9px] text-secondary font-bold uppercase tracking-widest mb-1">Plafon Diajukan</Text>
-                    <Text className="text-dark font-black text-base">{display.amount}</Text>
-                </View>
-                <View className="items-end">
-                    <Text className="text-[9px] text-secondary font-bold uppercase tracking-widest mb-1">Tenor</Text>
-                    <Text className="text-dark font-bold text-sm">12 Bulan</Text>
+                    <Text className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">Jumlah pengajuan</Text>
+                    <Text className="text-dark font-black text-[12px] mt-0.5">{display.amount}</Text>
                 </View>
             </View>
 
             {!isCompleted ? (
                 <TouchableOpacity
                     onPress={onAction}
-                    activeOpacity={0.8}
-                    className="w-full py-4 rounded-[20px] items-center bg-primary"
-                    style={{
-                        shadowColor: '#3b82f6',
-                        shadowOffset: { width: 0, height: 4 },
-                        shadowOpacity: 0.15,
-                        shadowRadius: 10,
-                        elevation: 4
-                    }}
+                    className="w-full py-3.5 rounded-xl items-center shadow-lg shadow-blue-100"
+                    style={{ backgroundColor: config.color === '#6B7280' ? '#2563EB' : config.color }}
                 >
-                    <View className="flex-row items-center">
-                        <Text className="text-white font-black text-[12px] uppercase tracking-[2px]">
-                            {statusKey === 'IN_PROGRESS' ? 'Lanjutkan Survey' :
-                                !survey ? 'Mulai Survey' :
-                                    statusKey === 'ASSIGNED' ? 'Terima & Mulai' : 'Buka Survey'}
-                        </Text>
-                        <ChevronRight size={14} color="#fff" strokeWidth={3} style={{ marginLeft: 6 }} />
-                    </View>
+                    <Text className="text-white font-black text-[11px] uppercase tracking-widest">
+                        {statusKey === 'IN_PROGRESS' ? 'Lanjutkan Survey →' :
+                            !survey ? 'Mulai Survey →' :
+                                statusKey === 'ASSIGNED' ? 'Terima & Mulai →' : 'Buka Survey →'}
+                    </Text>
                 </TouchableOpacity>
             ) : (
-                <View className="bg-emerald-50/70 py-4 rounded-2xl items-center border border-emerald-100/50">
+                <View className="bg-emerald-50 py-3 rounded-xl items-center border border-emerald-100">
                     <View className="flex-row items-center">
-                        <CheckCircle size={16} color="#059669" strokeWidth={2.5} />
-                        <Text className="text-emerald-700 font-black text-[12px] uppercase tracking-[2px] ml-2.5">Survey Selesai</Text>
+                        <CheckCircle size={14} color="#059669" />
+                        <Text className="text-emerald-600 font-black text-[11px] uppercase tracking-widest ml-2">Survey Selesai</Text>
                     </View>
                 </View>
             )}

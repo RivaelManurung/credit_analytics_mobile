@@ -67,10 +67,10 @@ function AppContent() {
         <ApplicationListScreen />
       )}
 
-      {currentScreen === 'SurveyForm' && params?.surveyId && (
+      {currentScreen === 'SurveyForm' && params?.surveyId && params?.applicationId && (
         <SurveyFormScreen
           surveyId={params.surveyId}
-          templateId={params.templateId || ''}
+          applicationId={params.applicationId}
           onBack={handleNavigateDashboard}
         />
       )}

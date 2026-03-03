@@ -2,12 +2,13 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
     View, Text, ScrollView, TouchableOpacity, ActivityIndicator,
     TextInput, Alert, BackHandler, StyleSheet, Dimensions,
+    Modal, FlatList, Pressable,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
     ArrowLeft, ClipboardList, CheckCircle2, ChevronRight,
     CheckCircle, Loader2, Send, RefreshCw, AlertCircle,
-    FileText, Hash,
+    FileText, Hash, Lock, ChevronDown, Camera, Image as ImageIcon,
 } from 'lucide-react-native';
 import { useSurveyControl } from '../hooks/useSurveys';
 import { useAuth } from '../context/AuthContext';
@@ -18,38 +19,38 @@ const { width: SCREEN_W } = Dimensions.get('window');
 
 // ─── Premium Color Palette ──────────────────────────────────────────────────
 const C = {
-    bg: '#F7F8FC',
+    bg: '#F8FAFC',     // slate-50
     card: '#FFFFFF',
-    primary: '#4F46E5',   // indigo-600
-    primaryL: '#EEF2FF',   // indigo-50
-    primaryD: '#3730A3',   // indigo-800
-    accent: '#7C3AED',   // violet-600
-    accentL: '#F5F3FF',   // violet-50
-    success: '#059669',   // emerald-600
+    primary: '#2563EB',
+    primaryL: '#EFF6FF',
+    primaryD: '#1E40AF',
+    accent: '#7C3AED',
+    accentL: '#F5F3FF',
+    success: '#059669',
     successL: '#ECFDF5',
-    danger: '#DC2626',
-    dangerL: '#FEF2F2',
+    danger: '#E11D48',
+    dangerL: '#FFF1F2',
     warn: '#D97706',
     warnL: '#FFFBEB',
-    dark: '#0F172A',   // slate-900
-    text: '#1E293B',   // slate-800
-    sub: '#64748B',   // slate-500
-    muted: '#94A3B8',   // slate-400
-    border: '#E2E8F0',   // slate-200
-    borderL: '#F1F5F9',   // slate-100
+    dark: '#0F172A',
+    text: '#1E293B',
+    sub: '#64748B',
+    muted: '#94A3B8',
+    border: '#E2E8F0',
+    borderL: '#F1F5F9',
     white: '#FFFFFF',
 };
 
 interface Props {
     surveyId: string;
-    templateId: string;
+    applicationId: string;
     onBack: () => void;
 }
 
-export function SurveyFormScreen({ surveyId, templateId, onBack }: Props) {
+export function SurveyFormScreen({ surveyId, applicationId, onBack }: Props) {
     const insets = useSafeAreaInsets();
     const { surveyorId } = useAuth();
-    const { submitSurvey, submitSurveyAnswer, loading: actionLoading } = useSurveyControl();
+    const { startSurvey, submitSurvey, submitSurveyAnswer, loading: actionLoading } = useSurveyControl();
 
     const [survey, setSurvey] = useState<any>(null);
     const [sections, setSections] = useState<any[]>([]);
@@ -60,35 +61,95 @@ export function SurveyFormScreen({ surveyId, templateId, onBack }: Props) {
     const [answers, setAnswers] = useState<Record<string, any>>({});
     const [saving, setSaving] = useState(false);
     const [retryKey, setRetryKey] = useState(0);
+    const [localTxt, setLocalTxt] = useState('');
+    const [pickerOpen, setPickerOpen] = useState(false);
+
+    // Sync localTxt saat pindah pertanyaan
+    useEffect(() => {
+        if (currentSection) {
+            const q = currentSection.questions?.[qIdx];
+            if (q) setLocalTxt(answers[q.id] || '');
+        }
+    }, [currentSection, qIdx, answers]);
 
     // ─── Fetch ──────────────────────────────────────────────────────────────
     useEffect(() => {
         let alive = true;
         setLoading(true);
         setError('');
-        console.log('[SF] fetch', surveyId, templateId);
+        console.log('[SF] fetch surveyId=%s applicationId=%s', surveyId, applicationId);
 
-        Promise.all([
-            repo.getSurvey(surveyId),
-            repo.listSurveySections(templateId),
-        ]).then(([s, sec]) => {
-            if (!alive) return;
-            console.log('[SF] OK sections=' + sec.length);
-            setSurvey(s);
-            setSections(sec);
-            setLoading(false);
-        }).catch((e: any) => {
-            if (!alive) return;
-            setError(e?.message || 'Gagal memuat');
-            setLoading(false);
-        });
+        // Fetch surveys by applicationId untuk ambil templateId yang sesuai
+        repo.listSurveysByApplication(applicationId)
+            .then(async (surveys) => {
+                if (!alive) return;
+
+                const activeSurvey = surveys.find((s: any) => s.id === surveyId) ?? surveys[0];
+                if (!activeSurvey) throw new Error('Survey tidak ditemukan untuk nasabah ini.');
+
+                const derivedTemplateId = activeSurvey.templateId;
+                console.log('[SF] Found survey. templateId=%s status=%s', derivedTemplateId, activeSurvey.status);
+
+                // Fetch sections + existing answers secara paralel
+                const [sec, ans] = await Promise.all([
+                    repo.listSurveySections(derivedTemplateId),
+                    repo.listSurveyAnswers(surveyId).catch(() => []),
+                ]);
+
+                if (!alive) return;
+                console.log('[SF] sections=%d answers=%d', sec.length, ans.length);
+
+                setSurvey(activeSurvey);
+                setSections(sec);
+
+                // Auto-start jika masih ASSIGNED
+                if (activeSurvey.status === 'ASSIGNED' && surveyorId) {
+                    startSurvey(surveyId, surveyorId).catch(console.error);
+                }
+
+                const initialAnswers: Record<string, any> = {};
+                const qTypes: Record<string, string> = {};
+                sec.forEach(s => (s.questions || []).forEach(q => { qTypes[q.id] = q.answerType; }));
+
+                console.log('[SF] Mapping answers. Total raw:', ans.length);
+                ans.forEach((a: any) => {
+                    const qId = a.questionId || a.question_id;
+                    if (!qId) return;
+
+                    const type = qTypes[qId];
+                    // Support camelCase dan snake_case dari backend
+                    const txt = a.answerText ?? a.answer_text;
+                    const num = a.answerNumber ?? a.answer_number;
+                    const boo = a.answerBoolean ?? a.answer_boolean;
+                    const dat = a.answerDate ?? a.answer_date;
+
+                    if (type === 'BOOLEAN') {
+                        initialAnswers[qId] = (boo === true || txt === 'true' || txt === '1');
+                    } else if (type === 'NUMBER') {
+                        initialAnswers[qId] = (num !== undefined && num !== null && num !== '') ? num : txt;
+                    } else if (type === 'DATE') {
+                        initialAnswers[qId] = (dat !== undefined && dat !== null && dat !== '') ? dat : txt;
+                    } else {
+                        initialAnswers[qId] = txt || num || String(boo ?? '');
+                    }
+                });
+
+                console.log('[SF] Initial Answers Loaded:', Object.keys(initialAnswers).length);
+                setAnswers(initialAnswers);
+                setLoading(false);
+            }).catch((e: any) => {
+                if (!alive) return;
+                console.error('[SF] Fetch error:', e);
+                setError(e?.message || 'Gagal memuat data survey.');
+                setLoading(false);
+            });
 
         return () => { alive = false; };
-    }, [surveyId, templateId, retryKey]);
+    }, [surveyId, applicationId, retryKey]);
 
     useEffect(() => {
         const h = () => {
-            if (currentSection) { setCurrentSection(null); return true; }
+            if (currentSection) { onExitSection(); return true; }
             onBack(); return true;
         };
         const sub = BackHandler.addEventListener('hardwareBackPress', h);
@@ -101,7 +162,10 @@ export function SurveyFormScreen({ surveyId, templateId, onBack }: Props) {
         sections.forEach(s => {
             const qs = s.questions || [];
             totalQ += qs.length;
-            doneQ += qs.filter((q: any) => !!answers[q.id]).length;
+            doneQ += qs.filter((q: any) => {
+                const ans = answers[q.id];
+                return ans !== undefined && ans !== null && ans !== '';
+            }).length;
         });
         return { totalQ, doneQ, pct: totalQ > 0 ? Math.round((doneQ / totalQ) * 100) : 0 };
     }, [sections, answers]);
@@ -121,11 +185,34 @@ export function SurveyFormScreen({ surveyId, templateId, onBack }: Props) {
         finally { setSaving(false); }
     };
 
-    const onNext = () => {
+    const onNext = async () => {
         if (!currentSection) return;
         const qs = currentSection.questions || [];
+        const q = qs[qIdx];
+
+        // Simpan text input sebelum pindah
+        if (q.answerType !== 'BOOLEAN' && localTxt !== (answers[q.id] || '')) {
+            await onAnswer(q.id, localTxt, q.answerType);
+        }
+
+        const currentAns = answers[q?.id] ?? localTxt;
+        const hasAnswer = currentAns !== undefined && currentAns !== null && currentAns !== '';
+
+        if (!hasAnswer) {
+            Alert.alert('Belum Dijawab', 'Tolong berikan jawaban Anda sebelum melanjutkan.');
+            return;
+        }
+
         if (qIdx < qs.length - 1) setQIdx(qIdx + 1);
         else setCurrentSection(null);
+    };
+
+    const onExitSection = async () => {
+        const q = currentSection?.questions?.[qIdx];
+        if (q && q.answerType !== 'BOOLEAN' && localTxt !== (answers[q.id] || '')) {
+            await onAnswer(q.id, localTxt, q.answerType);
+        }
+        setCurrentSection(null);
     };
 
     const onSubmit = async () => {
@@ -195,7 +282,7 @@ export function SurveyFormScreen({ surveyId, templateId, onBack }: Props) {
                 {/* Header */}
                 <View style={[s.qHeader, { paddingTop: insets.top + 12 }]}>
                     <View style={s.qHeaderTop}>
-                        <TouchableOpacity onPress={() => setCurrentSection(null)} style={s.qBackBtn}>
+                        <TouchableOpacity onPress={onExitSection} style={s.qBackBtn}>
                             <ArrowLeft color={C.text} size={20} strokeWidth={2.5} />
                         </TouchableOpacity>
 
@@ -250,34 +337,81 @@ export function SurveyFormScreen({ surveyId, templateId, onBack }: Props) {
                                     );
                                 })}
                             </View>
-                        ) : (q.options?.length || 0) > 0 ? (
-                            <View style={{ gap: 12 }}>
-                                {q.options.map((opt: any, i: number) => {
-                                    const active = answers[q.id] === opt.optionValue;
-                                    return (
-                                        <TouchableOpacity key={opt.id || i}
-                                            onPress={() => onAnswer(q.id, opt.optionValue, 'TEXT')}
-                                            activeOpacity={0.7}
-                                            style={[s.optionBtn, active && s.optionBtnActive]}>
-                                            <View style={[s.optionRadio, active && s.optionRadioActive]}>
-                                                {active && <View style={s.optionRadioDot} />}
+                        ) : q.answerType === 'OPTION' || q.answerType === 'SELECT' ? (
+                            <View>
+                                <TouchableOpacity
+                                    activeOpacity={0.7}
+                                    onPress={() => setPickerOpen(true)}
+                                    style={s.pickerTrigger}>
+                                    <Text style={[s.pickerValue, !answers[q.id] && { color: C.muted }]}>
+                                        {q.options?.find((o: any) => o.optionValue === answers[q.id])?.optionLabel || 'Pilih jawaban...'}
+                                    </Text>
+                                    <ChevronDown color={C.sub} size={20} />
+                                </TouchableOpacity>
+
+                                <Modal visible={pickerOpen} transparent animationType="fade">
+                                    <Pressable style={s.modalOverlay} onPress={() => setPickerOpen(false)}>
+                                        <View style={s.pickerModal}>
+                                            <View style={s.pickerHeader}>
+                                                <Text style={s.pickerTitle}>Pilih Opsi</Text>
                                             </View>
-                                            <Text style={[s.optionLabel, active && s.optionLabelActive]}>
-                                                {opt.optionLabel}
-                                            </Text>
-                                        </TouchableOpacity>
-                                    );
-                                })}
+                                            <FlatList
+                                                data={q.options || []}
+                                                keyExtractor={(o, i) => o.id || String(i)}
+                                                renderItem={({ item: opt }) => {
+                                                    const active = answers[q.id] === opt.optionValue;
+                                                    return (
+                                                        <TouchableOpacity
+                                                            onPress={() => {
+                                                                onAnswer(q.id, opt.optionValue, 'TEXT');
+                                                                setPickerOpen(false);
+                                                            }}
+                                                            style={[s.pickerItem, active && s.pickerItemActive]}>
+                                                            <Text style={[s.pickerItemText, active && s.pickerItemTextActive]}>
+                                                                {opt.optionLabel}
+                                                            </Text>
+                                                            {active && <CheckCircle size={16} color={C.primary} />}
+                                                        </TouchableOpacity>
+                                                    );
+                                                }}
+                                            />
+                                        </View>
+                                    </Pressable>
+                                </Modal>
+                            </View>
+                        ) : q.answerType === 'IMAGE' ? (
+                            <View>
+                                <TouchableOpacity
+                                    activeOpacity={0.7}
+                                    onPress={() => Alert.alert('Kamera', 'Fitur Live Capture akan segera tersedia.')}
+                                    style={s.imageBtn}>
+                                    <View style={s.imageBtnIcon}>
+                                        <Camera color={C.primary} size={32} />
+                                    </View>
+                                    <View>
+                                        <Text style={s.imageBtnTitle}>Ambil Foto Lapangan</Text>
+                                        <Text style={s.imageBtnSub}>Pastikan lokasi terang & jelas</Text>
+                                    </View>
+                                    <TouchableOpacity style={s.imageBtnPlus}>
+                                        <ImageIcon color={C.white} size={14} />
+                                    </TouchableOpacity>
+                                </TouchableOpacity>
                             </View>
                         ) : (
                             <View style={s.textInputWrap}>
                                 <TextInput
                                     style={s.textInput}
-                                    placeholder="Ketik jawaban Anda di sini..."
+                                    placeholder={q.answerType === 'NUMBER' ? "Masukkan angka saja..." : "Ketik jawaban Anda di sini..."}
                                     placeholderTextColor={C.muted}
-                                    multiline
-                                    value={answers[q.id] || ''}
-                                    onChangeText={t => onAnswer(q.id, t, q.answerType)}
+                                    keyboardType={q.answerType === 'NUMBER' ? 'numeric' : 'default'}
+                                    multiline={q.answerType !== 'NUMBER'}
+                                    value={localTxt}
+                                    onChangeText={setLocalTxt}
+                                    onBlur={() => {
+                                        if (localTxt !== (answers[q.id] || '')) {
+                                            onAnswer(q.id, localTxt, q.answerType);
+                                        }
+                                    }}
                                 />
                             </View>
                         )}
@@ -287,14 +421,30 @@ export function SurveyFormScreen({ surveyId, templateId, onBack }: Props) {
                 {/* Bottom Nav */}
                 <View style={s.qFooter}>
                     <TouchableOpacity
-                        onPress={() => qIdx > 0 ? setQIdx(qIdx - 1) : setCurrentSection(null)}
+                        onPress={() => qIdx > 0 ? setQIdx(qIdx - 1) : onExitSection()}
                         style={s.qPrevBtn} activeOpacity={0.7}>
                         <ArrowLeft color={C.sub} size={20} strokeWidth={2.5} />
                     </TouchableOpacity>
-                    <TouchableOpacity onPress={onNext} style={[s.qNextBtn, isLast && { backgroundColor: C.success }]} activeOpacity={0.8}>
-                        <Text style={s.qNextBtnText}>{isLast ? 'SELESAI' : 'LANJUT'}</Text>
-                        <ChevronRight color={C.white} size={18} strokeWidth={3} />
-                    </TouchableOpacity>
+
+                    {/* Next Button Style Updates */}
+                    {(() => {
+                        const q = qs[qIdx];
+                        const hasAns = answers[q?.id] !== undefined && answers[q?.id] !== '';
+                        return (
+                            <TouchableOpacity
+                                onPress={onNext}
+                                style={[
+                                    s.qNextBtn,
+                                    isLast && { backgroundColor: C.success },
+                                    !hasAns && { opacity: 0.5 }
+                                ]}
+                                activeOpacity={hasAns ? 0.8 : 1}
+                            >
+                                <Text style={s.qNextBtnText}>{isLast ? 'SELESAI' : 'LANJUT'}</Text>
+                                <ChevronRight color={C.white} size={18} strokeWidth={3} />
+                            </TouchableOpacity>
+                        );
+                    })()}
                 </View>
             </View>
         );
@@ -305,104 +455,139 @@ export function SurveyFormScreen({ surveyId, templateId, onBack }: Props) {
     // ════════════════════════════════════════════════════════════════════════
     return (
         <View style={{ flex: 1, backgroundColor: C.bg }}>
-            {/* Hero Header */}
-            <View style={[s.heroWrap, { paddingTop: insets.top + 12 }]}>
-                <View style={s.heroInner}>
-                    <TouchableOpacity onPress={onBack} style={s.heroBackBtn} activeOpacity={0.7}>
-                        <ArrowLeft color={C.white} size={22} strokeWidth={2.5} />
-                    </TouchableOpacity>
-
-                    <Text style={s.heroLabel}>SURVEY FORM</Text>
-                    <Text style={s.heroName}>{survey.applicantName || 'Applicant'}</Text>
-
-                    <View style={s.heroMeta}>
-                        <View style={s.heroBadge}>
-                            <Hash color="rgba(255,255,255,0.9)" size={12} strokeWidth={3} />
-                            <Text style={s.heroBadgeText}>{surveyId.substring(0, 8).toUpperCase()}</Text>
+            <ScrollView
+                style={{ flex: 1 }}
+                contentContainerStyle={{ paddingBottom: 120 }}
+                showsVerticalScrollIndicator={false}
+            >
+                {/* Hero Header - Now Inside ScrollView */}
+                <View style={[s.heroWrap, { paddingTop: insets.top + 20 }]}>
+                    <View style={s.heroInner}>
+                        {/* Header Top Row: Back + Label */}
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 20 }}>
+                            <TouchableOpacity onPress={onBack} style={s.heroBackBtn} activeOpacity={0.7}>
+                                <ArrowLeft color={C.white} size={18} strokeWidth={3} />
+                            </TouchableOpacity>
+                            <Text style={[s.heroLabel, { marginBottom: 0, marginLeft: 12 }]}>SURVEY FORM</Text>
                         </View>
-                        <Text style={s.heroPurpose}>{survey.surveyPurpose || 'Survey Lapangan'}</Text>
-                    </View>
 
-                    {/* Overall Progress */}
-                    <View style={s.heroProgress}>
-                        <View style={s.heroProgressHeader}>
-                            <Text style={s.heroProgressLabel}>Progress Keseluruhan</Text>
-                            <Text style={s.heroProgressPct}>{stats.pct}%</Text>
-                        </View>
-                        <View style={s.heroProgressTrack}>
-                            <View style={[s.heroProgressFill, { width: `${stats.pct}%` }]} />
-                        </View>
-                        <Text style={s.heroProgressSub}>
-                            {stats.doneQ} dari {stats.totalQ} pertanyaan dijawab
-                        </Text>
-                    </View>
-                </View>
-            </View>
+                        {/* Info Section Below */}
+                        <Text style={s.heroName}>{survey.applicantName || 'Applicant'}</Text>
 
-            {/* Section Cards */}
-            <ScrollView style={{ flex: 1 }}
-                contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 4, paddingBottom: 120 }}
-                showsVerticalScrollIndicator={false}>
-
-                <View style={s.sectionHeader}>
-                    <View>
-                        <Text style={s.sectionTitle}>Daftar Bagian</Text>
-                        <Text style={s.sectionSub}>Klik untuk mulai mengisi</Text>
-                    </View>
-                    <View style={s.sectionCount}>
-                        <FileText color={C.primary} size={14} />
-                        <Text style={s.sectionCountText}>{sections.length}</Text>
-                    </View>
-                </View>
-
-                {sections.map((sec: any, idx: number) => {
-                    const qs = sec.questions || [];
-                    const done = qs.filter((q: any) => !!answers[q.id]).length;
-                    const total = qs.length;
-                    const full = total > 0 && done === total;
-                    const pct = total > 0 ? Math.round((done / total) * 100) : 0;
-
-                    return (
-                        <TouchableOpacity key={sec.id || idx}
-                            onPress={() => { setCurrentSection(sec); setQIdx(0); }}
-                            activeOpacity={0.7}
-                            style={s.sectionCard}>
-
-                            {/* Left Icon */}
-                            <View style={[s.secIcon, { backgroundColor: full ? C.successL : C.primaryL }]}>
-                                {full
-                                    ? <CheckCircle2 color={C.success} size={26} strokeWidth={2} />
-                                    : <ClipboardList color={C.primary} size={26} strokeWidth={2} />}
+                        <View style={s.heroMeta}>
+                            <View style={s.heroBadge}>
+                                <Hash color="rgba(255,255,255,0.9)" size={12} strokeWidth={3} />
+                                <Text style={s.heroBadgeText}>{surveyId.substring(0, 8).toUpperCase()}</Text>
                             </View>
+                        </View>
 
-                            {/* Content */}
-                            <View style={{ flex: 1 }}>
-                                <View style={s.secTopRow}>
-                                    <Text style={s.secLabel}>BAGIAN {idx + 1}</Text>
-                                    <Text style={[s.secStatus, { color: full ? C.success : C.primary }]}>
-                                        {full ? '✓ Selesai' : `${done}/${total}`}
-                                    </Text>
+                        {/* Overall Progress */}
+                        <View style={s.heroProgress}>
+                            <View style={s.heroProgressHeader}>
+                                <Text style={s.heroProgressLabel}>Progress Keseluruhan</Text>
+                                <Text style={s.heroProgressPct}>{stats.pct}%</Text>
+                            </View>
+                            <View style={s.heroProgressTrack}>
+                                <View style={[s.heroProgressFill, { width: `${stats.pct}%` }]} />
+                            </View>
+                            <Text style={s.heroProgressSub}>
+                                {stats.doneQ} dari {stats.totalQ} pertanyaan dijawab
+                            </Text>
+                        </View>
+                    </View>
+                </View>
+
+                {/* Section Cards Container */}
+                <View style={{ paddingHorizontal: 20, paddingTop: 10 }}>
+                    <View style={s.sectionHeader}>
+                        <View>
+                            <Text style={s.sectionTitle}>Daftar Bagian</Text>
+                            <Text style={s.sectionSub}>Klik untuk mulai mengisi</Text>
+                        </View>
+                        <View style={s.sectionCount}>
+                            <FileText color={C.primary} size={14} />
+                            <Text style={s.sectionCountText}>{sections.length}</Text>
+                        </View>
+                    </View>
+
+                    {sections.map((sec: any, idx: number) => {
+                        const qs = sec.questions || [];
+                        const done = qs.filter((q: any) => {
+                            const ans = answers[q.id];
+                            return ans !== undefined && ans !== null && ans !== '';
+                        }).length;
+                        const total = qs.length;
+                        const full = total > 0 && done === total;
+                        const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+
+                        // Check if previous section is complete
+                        let isLocked = false;
+                        if (idx > 0) {
+                            const prevSec = sections[idx - 1];
+                            const prevQs = prevSec.questions || [];
+                            const prevDone = prevQs.filter((q: any) => {
+                                const ans = answers[q.id];
+                                return ans !== undefined && ans !== null && ans !== '';
+                            }).length;
+                            isLocked = prevDone < prevQs.length;
+                        }
+
+                        return (
+                            <TouchableOpacity key={sec.id || idx}
+                                onPress={() => {
+                                    if (isLocked) {
+                                        Alert.alert('Bagian Terkunci', 'Selesaikan bagian sebelumnya terlebih dahulu untuk membuka bagian ini.');
+                                        return;
+                                    }
+                                    setCurrentSection(sec);
+                                    setQIdx(0);
+                                }}
+                                activeOpacity={isLocked ? 1 : 0.7}
+                                style={[s.sectionCard, isLocked && { opacity: 0.6, borderColor: C.border }]}>
+
+                                {/* Left Icon */}
+                                <View style={[s.secIcon, { backgroundColor: isLocked ? C.borderL : (full ? C.successL : C.primaryL) }]}>
+                                    {isLocked ? (
+                                        <Lock color={C.muted} size={24} />
+                                    ) : (
+                                        full
+                                            ? <CheckCircle2 color={C.success} size={26} strokeWidth={2} />
+                                            : <ClipboardList color={C.primary} size={26} strokeWidth={2} />
+                                    )}
                                 </View>
-                                <Text style={s.secName}>{sec.sectionName}</Text>
 
-                                {/* Mini progress */}
-                                <View style={s.secProgressWrap}>
-                                    <View style={s.secProgressTrack}>
-                                        <View style={[
-                                            s.secProgressFill,
-                                            { width: `${pct}%`, backgroundColor: full ? C.success : C.primary },
-                                        ]} />
+                                {/* Content */}
+                                <View style={{ flex: 1 }}>
+                                    <View style={s.secTopRow}>
+                                        <Text style={s.secLabel}>BAGIAN {idx + 1}</Text>
+                                        <Text style={[s.secStatus, { color: isLocked ? C.muted : (full ? C.success : C.primary) }]}>
+                                            {isLocked ? 'Terkunci' : (full ? '✓ Selesai' : `${done}/${total}`)}
+                                        </Text>
                                     </View>
-                                    <Text style={[s.secProgressText, { color: full ? C.success : C.sub }]}>
-                                        {pct}%
-                                    </Text>
-                                </View>
-                            </View>
+                                    <Text style={[s.secName, isLocked && { color: C.muted }]}>{sec.sectionName}</Text>
 
-                            <ChevronRight color={C.border} size={20} />
-                        </TouchableOpacity>
-                    );
-                })}
+                                    {/* Mini progress */}
+                                    <View style={s.secProgressWrap}>
+                                        <View style={s.secProgressTrack}>
+                                            <View style={[
+                                                s.secProgressFill,
+                                                {
+                                                    width: `${pct}%`,
+                                                    backgroundColor: isLocked ? C.muted : (full ? C.success : C.primary)
+                                                },
+                                            ]} />
+                                        </View>
+                                        <Text style={[s.secProgressText, { color: full ? C.success : C.sub }]}>
+                                            {pct}%
+                                        </Text>
+                                    </View>
+                                </View>
+
+                                {isLocked ? null : <ChevronRight color={C.border} size={20} />}
+                            </TouchableOpacity>
+                        );
+                    })}
+                </View>
             </ScrollView>
 
             {/* Submit Button */}
@@ -483,9 +668,9 @@ const s = StyleSheet.create({
         paddingHorizontal: 24,
     },
     heroBackBtn: {
-        width: 44, height: 44, borderRadius: 14,
-        backgroundColor: 'rgba(255,255,255,0.15)',
-        alignItems: 'center', justifyContent: 'center', marginBottom: 24,
+        width: 32, height: 32, borderRadius: 10,
+        backgroundColor: 'rgba(255,255,255,0.2)',
+        alignItems: 'center', justifyContent: 'center',
     },
     heroLabel: {
         color: 'rgba(255,255,255,0.55)', fontSize: 11, fontWeight: '900',
@@ -717,5 +902,63 @@ const s = StyleSheet.create({
     },
     qNextBtnText: {
         color: C.white, fontWeight: '900', fontSize: 13, letterSpacing: 2, textTransform: 'uppercase',
+    },
+
+    // ── Picker ──────────────────────────────────────
+    pickerTrigger: {
+        flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+        backgroundColor: C.card, paddingHorizontal: 20, paddingVertical: 18,
+        borderRadius: 18, borderWidth: 1, borderColor: C.border,
+    },
+    pickerValue: {
+        fontSize: 16, fontWeight: '700', color: C.text,
+    },
+    modalOverlay: {
+        flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.4)', justifyContent: 'flex-end',
+    },
+    pickerModal: {
+        backgroundColor: C.card, borderTopLeftRadius: 32, borderTopRightRadius: 32,
+        maxHeight: Dimensions.get('window').height * 0.7, paddingBottom: 40,
+    },
+    pickerHeader: {
+        padding: 24, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: C.borderL,
+    },
+    pickerTitle: {
+        fontSize: 18, fontWeight: '900', color: C.dark,
+    },
+    pickerItem: {
+        flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+        padding: 24, borderBottomWidth: 1, borderBottomColor: C.borderL,
+    },
+    pickerItemActive: {
+        backgroundColor: C.primaryL,
+    },
+    pickerItemText: {
+        fontSize: 16, fontWeight: '700', color: C.text,
+    },
+    pickerItemTextActive: {
+        color: C.primary, fontWeight: '800',
+    },
+
+    // ── Image Button ────────────────────────────────
+    imageBtn: {
+        flexDirection: 'row', alignItems: 'center',
+        backgroundColor: C.card, padding: 16, borderRadius: 24,
+        borderWidth: 1, borderColor: C.border, gap: 16,
+    },
+    imageBtnIcon: {
+        width: 64, height: 64, borderRadius: 16,
+        backgroundColor: C.primaryL, alignItems: 'center', justifyContent: 'center',
+    },
+    imageBtnTitle: {
+        fontSize: 16, fontWeight: '800', color: C.dark, marginBottom: 2,
+    },
+    imageBtnSub: {
+        fontSize: 12, color: C.sub, fontWeight: '600',
+    },
+    imageBtnPlus: {
+        position: 'absolute', right: 12, top: 12,
+        width: 24, height: 24, borderRadius: 12,
+        backgroundColor: C.primary, alignItems: 'center', justifyContent: 'center',
     },
 });

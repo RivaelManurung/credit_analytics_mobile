@@ -10,6 +10,7 @@ import {
     ApplicationSurvey,
     SurveySection,
     SurveyTemplate,
+    SurveyAnswer,
 } from '../../gen/survey/v1/survey_pb';
 import { scrubJson } from '../network/utils';
 
@@ -154,12 +155,34 @@ export class SurveyRepositoryImpl {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
+                survey_id: surveyId,
                 question_id: questionId,
                 answer_text: answer.text,
                 answer_number: answer.number,
                 answer_boolean: answer.boolean,
                 answer_date: answer.date,
             }),
+        });
+    }
+
+    async listSurveyAnswers(surveyId: string): Promise<SurveyAnswer[]> {
+        const data = await restFetch<any>(`${this.baseUrl}/v1/surveys/${surveyId}/answers`);
+        // Unwrap: try multiple common keys
+        const list: any[] = Array.isArray(data) ? data : (data?.answers || data?.data || data?.items || []);
+        console.log(`[REST] listSurveyAnswers: Found ${list.length} raw items`);
+
+        return list.map((a: any) => {
+            try {
+                // Ensure qId is string for fromJson to be happy if it's missing
+                if (!a.question_id && !a.questionId) {
+                    console.warn('[REST] Answer missing question_id:', a);
+                }
+                return SurveyAnswer.fromJson(scrubJson(a), { ignoreUnknownFields: true });
+            } catch (e) {
+                console.error('[REST] Error parsing answer:', e, a);
+                // Return a minimal valid message-like object if parsing fails
+                return new SurveyAnswer({ questionId: a.question_id || a.questionId, answerText: String(a.answer_text || a.answerText || '') });
+            }
         });
     }
 }
