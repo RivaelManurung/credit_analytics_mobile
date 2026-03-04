@@ -1,0 +1,65 @@
+syntax = "proto3";
+
+package api.media.v1;
+
+import "google/api/annotations.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "credit-analytics-backend/api/media/v1;v1";
+option java_multiple_files = true;
+option java_package = "api.media.v1";
+
+service MediaService {
+  rpc UploadDocument (UploadDocumentRequest) returns (Document) {
+    option (google.api.http) = {
+      post: "/v1/media/documents",
+      body: "*"
+    };
+  }
+
+  rpc ListDocuments (ListDocumentsRequest) returns (ListDocumentsResponse) {
+    option (google.api.http) = {
+      get: "/v1/media/documents"
+    };
+  }
+
+  rpc GetPresignedUrl (GetPresignedUrlRequest) returns (GetPresignedUrlResponse) {
+    option (google.api.http) = {
+      get: "/v1/media/presigned-url"
+    };
+  }
+}
+
+message Document {
+  string id = 1;
+  string application_id = 2;
+  string document_name = 3;
+  string file_url = 4;
+  string document_type = 5;
+  google.protobuf.Timestamp uploaded_at = 6;
+}
+
+message UploadDocumentRequest {
+  string application_id = 1;
+  string document_name = 2;
+  string file_url = 3;
+  string document_type = 4;
+}
+
+message ListDocumentsRequest {
+  string application_id = 1;
+}
+
+message ListDocumentsResponse {
+  repeated Document documents = 1;
+}
+
+message GetPresignedUrlRequest {
+  string file_name = 1;
+  string file_type = 2; // Hanya pdf, png, jpeg
+}
+
+message GetPresignedUrlResponse {
+  string upload_url = 1;
+  string file_url = 2; // Final URL after successful upload
+}

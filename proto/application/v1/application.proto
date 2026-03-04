@@ -1,0 +1,201 @@
+syntax = "proto3";
+
+package api.application.v1;
+
+import "google/api/annotations.proto";
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
+
+option go_package = "credit-analytics-backend/api/application/v1;v1";
+option java_multiple_files = true;
+option java_package = "api.application.v1";
+
+service ApplicationService {
+  rpc CreateApplication (CreateApplicationRequest) returns (Application) {
+    option (google.api.http) = {
+      post: "/v1/applications",
+      body: "*"
+    };
+  }
+  rpc GetApplication (GetApplicationRequest) returns (Application) {
+    option (google.api.http) = {
+      get: "/v1/applications/{id}"
+    };
+  }
+  rpc ListApplications (ListApplicationsRequest) returns (ListApplicationsResponse) {
+    option (google.api.http) = {
+      get: "/v1/applications"
+    };
+  }
+  rpc UpdateApplication (UpdateApplicationRequest) returns (Application) {
+    option (google.api.http) = {
+      put: "/v1/applications/{id}",
+      body: "*"
+    };
+  }
+
+  rpc GetApplicationAttributes (GetApplicationAttributesRequest) returns (ApplicationAttributes) {
+    option (google.api.http) = {
+      get: "/v1/applications/{application_id}/attributes"
+    };
+  }
+  rpc UpsertApplicationAttributes (UpsertApplicationAttributesRequest) returns (ApplicationAttributes) {
+    option (google.api.http) = {
+      post: "/v1/applications/{application_id}/attributes",
+      body: "*"
+    };
+  }
+  rpc ChangeApplicationStatus (ChangeApplicationStatusRequest) returns (Application) {
+    option (google.api.http) = {
+      put: "/v1/applications/{id}/status",
+      body: "*"
+    };
+  }
+}
+
+service PartyService {
+  rpc AddPartyToApplication (AddPartyToApplicationRequest) returns (ApplicationParty) {
+    option (google.api.http) = {
+      post: "/v1/applications/{application_id}/parties",
+      body: "*"
+    };
+  }
+  rpc RemovePartyFromApplication (RemovePartyFromApplicationRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {
+      delete: "/v1/applications/{application_id}/parties/{party_id}"
+    };
+  }
+  rpc ListApplicationParties (ListApplicationPartiesRequest) returns (ListApplicationPartiesResponse) {
+    option (google.api.http) = {
+      get: "/v1/applications/{application_id}/parties"
+    };
+  }
+}
+
+message ApplicationAttribute {
+  string attribute_id = 1;
+  string value = 2;
+  string data_type = 3;
+  string attribute_option_id = 4;
+}
+
+message ApplicationAttributes {
+  repeated ApplicationAttribute attributes = 1;
+}
+
+message Application {
+  string id = 1;
+  string applicant_id = 2;
+  string applicant_name = 16;
+  string product_id = 3;
+  string ao_id = 4;
+  string loan_amount = 5;
+  int32 tenor_months = 6;
+  string interest_type = 7;
+  string interest_rate = 8;
+  string loan_purpose = 9;
+  string application_channel = 10;
+  string status = 11;
+  string branch_code = 12;
+  repeated ApplicationAttribute attributes = 13;
+  google.protobuf.Timestamp submitted_at = 14;
+  google.protobuf.Timestamp created_at = 15;
+}
+
+
+message ApplicationParty {
+  string application_id = 1;
+  string party_id = 2;
+  string party_type = 3;
+  string name = 4;
+  string identifier = 5;
+  string role_code = 6;
+  bool legal_obligation = 7;
+  bool slik_required = 8;
+}
+
+message CreateApplicationRequest {
+  string applicant_id = 1;
+  string product_id = 2;
+  string ao_id = 3;
+  string loan_amount = 4;
+  int32 tenor_months = 5;
+  string interest_type = 6;
+  string interest_rate = 7;
+  string loan_purpose = 8;
+  string application_channel = 9;
+  string branch_code = 10;
+  repeated ApplicationAttribute attributes = 11;
+}
+
+message GetApplicationRequest {
+  string id = 1;
+}
+
+message ListApplicationsRequest {
+  // Cursor dari response sebelumnya (opaque token). Jika kosong, ambil halaman pertama.
+  string cursor = 1;
+  // Jumlah data per halaman. Default 10, Max 100.
+  int32 page_size = 2;
+  // Filter status aplikasi
+  string status = 3;
+  // Filter berdasarkan ID Applicant
+  string applicant_id = 4;
+}
+
+message ListApplicationsResponse {
+  repeated Application applications = 1;
+  // Token untuk mengambil halaman berikutnya (opaque token).
+  string next_cursor = 2;
+  // Flag apakah ada halaman berikutnya.
+  bool has_next = 3;
+}
+
+message UpdateApplicationRequest {
+  string id = 1;
+  string applicant_id = 2;
+  string product_id = 3;
+  string ao_id = 4;
+  string loan_amount = 5;
+  int32 tenor_months = 6;
+  string interest_type = 7;
+  string interest_rate = 8;
+  string loan_purpose = 9;
+  string status = 10;
+  repeated ApplicationAttribute attributes = 11;
+}
+
+message GetApplicationAttributesRequest {
+  string application_id = 1;
+}
+
+message UpsertApplicationAttributesRequest {
+  string application_id = 1;
+  repeated ApplicationAttribute attributes = 2;
+}
+
+message ChangeApplicationStatusRequest {
+  string id = 1;
+  string new_status = 2;
+  string reason = 3;
+}
+
+message AddPartyToApplicationRequest {
+  string application_id = 1;
+  string party_id = 2;
+  string role_code = 3;
+  bool slik_required = 4;
+}
+
+message RemovePartyFromApplicationRequest {
+  string application_id = 1;
+  string party_id = 2;
+}
+
+message ListApplicationPartiesRequest {
+  string application_id = 1;
+}
+
+message ListApplicationPartiesResponse {
+  repeated ApplicationParty parties = 1;
+}

@@ -1,15 +1,14 @@
 import React, { useState } from 'react';
-import { View, TouchableOpacity, Dimensions } from 'react-native';
+import { View, TouchableOpacity } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SidebarContent } from '../Sidebar/SidebarContent';
 import { Header } from '../Header/Header';
+import { LAYOUT } from '../../../constants';
 
 interface SidebarLayoutProps {
     children: React.ReactNode;
     headerTitle?: string;
 }
-
-const { width } = Dimensions.get('window');
 
 export function SidebarLayout({ children, headerTitle = 'CA Mobile Survey' }: SidebarLayoutProps) {
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -39,7 +38,7 @@ export function SidebarLayout({ children, headerTitle = 'CA Mobile Survey' }: Si
                 className={`absolute top-0 bottom-0 bg-primary z-20 shadow-xl ${isSidebarOpen ? 'left-0' : '-left-full'}`}
                 style={{
                     paddingTop: insets.top,
-                    width: width * 0.75
+                    width: LAYOUT.window.width * 0.75
                 }}
             >
                 <SidebarContent onClose={toggleSidebar} />

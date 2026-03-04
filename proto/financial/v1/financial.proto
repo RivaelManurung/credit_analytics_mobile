@@ -1,0 +1,203 @@
+syntax = "proto3";
+
+package api.financial.v1;
+
+import "google/api/annotations.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "credit-analytics-backend/api/financial/v1;v1";
+option java_multiple_files = true;
+option java_package = "api.financial.v1";
+
+service FinancialService {
+  rpc UpsertFinancialFact (UpsertFinancialFactRequest) returns (ApplicationFinancialFact) {
+    option (google.api.http) = {
+      post: "/v1/applications/{application_id}/financial-facts",
+      body: "*"
+    };
+  }
+  rpc ListFinancialFacts (ListFinancialFactsRequest) returns (ListFinancialFactsResponse) {
+    option (google.api.http) = {
+      get: "/v1/applications/{application_id}/financial-facts"
+    };
+  }
+
+  rpc AddAsset (AddAssetRequest) returns (ApplicationAsset) {
+    option (google.api.http) = {
+      post: "/v1/applications/{application_id}/assets",
+      body: "*"
+    };
+  }
+  rpc UpdateAsset (UpdateAssetRequest) returns (ApplicationAsset) {
+    option (google.api.http) = {
+      put: "/v1/applications/{application_id}/assets/{id}",
+      body: "*"
+    };
+  }
+  rpc ListAssetsByApplication (ListAssetsByApplicationRequest) returns (ListAssetsResponse) {
+    option (google.api.http) = {
+      get: "/v1/applications/{application_id}/assets"
+    };
+  }
+
+  rpc AddLiability (AddLiabilityRequest) returns (ApplicationLiability) {
+    option (google.api.http) = {
+      post: "/v1/applications/{application_id}/liabilities",
+      body: "*"
+    };
+  }
+  rpc UpdateLiability (UpdateLiabilityRequest) returns (ApplicationLiability) {
+    option (google.api.http) = {
+      put: "/v1/applications/{application_id}/liabilities/{id}",
+      body: "*"
+    };
+  }
+  rpc ListLiabilitiesByApplication (ListLiabilitiesByApplicationRequest) returns (ListLiabilitiesResponse) {
+    option (google.api.http) = {
+      get: "/v1/applications/{application_id}/liabilities"
+    };
+  }
+
+  rpc CalculateFinancialRatios (CalculateFinancialRatiosRequest) returns (ListFinancialRatiosResponse) {
+    option (google.api.http) = {
+      post: "/v1/applications/{application_id}/financial-ratios/calculate",
+      body: "*"
+    };
+  }
+}
+
+message ApplicationFinancialFact {
+  string id = 1;
+  string application_id = 2;
+  string gl_code = 3;
+  string period_type = 4;
+  string period_label = 5;
+  string amount = 6;
+  string source = 7;
+  string confidence_level = 8;
+  google.protobuf.Timestamp created_at = 9;
+}
+
+message ApplicationAsset {
+  string id = 1;
+  string application_id = 2;
+  string asset_type_code = 3;
+  string asset_name = 4;
+  string ownership_status = 5;
+  int32 acquisition_year = 6;
+  string estimated_value = 7;
+  string valuation_method = 8;
+  string location_text = 9;
+  bool encumbered = 10;
+}
+
+message ApplicationLiability {
+  string id = 1;
+  string application_id = 2;
+  string creditor_name = 3;
+  string liability_type = 4;
+  string outstanding_amount = 5;
+  string monthly_installment = 6;
+  string interest_rate = 7;
+  string maturity_date = 8;
+  string source = 9;
+}
+
+message FinancialRatio {
+  string id = 1;
+  string application_id = 2;
+  string ratio_code = 3;
+  string ratio_value = 4;
+  string calculation_version = 5;
+  google.protobuf.Timestamp calculated_at = 6;
+}
+
+message UpsertFinancialFactRequest {
+  string application_id = 1;
+  string gl_code = 2;
+  string period_type = 3;
+  string period_label = 4;
+  string amount = 5;
+  string source = 6;
+  string confidence_level = 7;
+}
+
+message ListFinancialFactsRequest {
+  string application_id = 1;
+}
+
+message ListFinancialFactsResponse {
+  repeated ApplicationFinancialFact facts = 1;
+}
+
+message AddAssetRequest {
+  string application_id = 1;
+  string asset_type_code = 2;
+  string asset_name = 3;
+  string ownership_status = 4;
+  int32 acquisition_year = 5;
+  string estimated_value = 6;
+  string valuation_method = 7;
+  string location_text = 8;
+  bool encumbered = 9;
+}
+
+message UpdateAssetRequest {
+  string id = 1;
+  string application_id = 2;
+  string asset_type_code = 3;
+  string asset_name = 4;
+  string ownership_status = 5;
+  int32 acquisition_year = 6;
+  string estimated_value = 7;
+  string valuation_method = 8;
+  string location_text = 9;
+  bool encumbered = 10;
+}
+
+message ListAssetsByApplicationRequest {
+  string application_id = 1;
+}
+
+message ListAssetsResponse {
+  repeated ApplicationAsset assets = 1;
+}
+
+message AddLiabilityRequest {
+  string application_id = 1;
+  string creditor_name = 2;
+  string liability_type = 3;
+  string outstanding_amount = 4;
+  string monthly_installment = 5;
+  string interest_rate = 6;
+  string maturity_date = 7;
+  string source = 8;
+}
+
+message UpdateLiabilityRequest {
+  string id = 1;
+  string application_id = 2;
+  string creditor_name = 3;
+  string liability_type = 4;
+  string outstanding_amount = 5;
+  string monthly_installment = 6;
+  string interest_rate = 7;
+  string maturity_date = 8;
+  string source = 9;
+}
+
+message ListLiabilitiesByApplicationRequest {
+  string application_id = 1;
+}
+
+message ListLiabilitiesResponse {
+  repeated ApplicationLiability liabilities = 1;
+}
+
+message CalculateFinancialRatiosRequest {
+  string application_id = 1;
+}
+
+message ListFinancialRatiosResponse {
+  repeated FinancialRatio ratios = 1;
+}

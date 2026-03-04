@@ -1,6 +1,6 @@
 import { createGrpcClient } from '../network/grpcClient';
 import { ApplicationService } from '../../gen/application/v1/application_connect';
-import { ListApplicationsRequest, Application } from '../../gen/application/v1/application_pb';
+import { ListApplicationsRequest, Application, ChangeApplicationStatusRequest } from '../../gen/application/v1/application_pb';
 import { scrubJson } from '../network/utils';
 import { API_URL } from '@env';
 
@@ -31,7 +31,6 @@ export class ApplicationRepositoryImpl {
 
     async changeApplicationStatus(id: string, newStatus: string, reason: string): Promise<Application> {
         try {
-            const { ChangeApplicationStatusRequest } = await import('../../gen/application/v1/application_pb');
             return await this.client.changeApplicationStatus(new ChangeApplicationStatusRequest({ id, newStatus, reason }));
         } catch (error) {
             const res = await fetch(`${this.baseUrl}/v1/applications/${id}/status`, {

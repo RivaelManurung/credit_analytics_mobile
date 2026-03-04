@@ -1502,3 +1502,120 @@ export class ListSurveyTemplatesResponse extends Message<ListSurveyTemplatesResp
   }
 }
 
+/**
+ * @generated from message api.reference.v1.Choice
+ */
+export class Choice extends Message<Choice> {
+  /**
+   * @generated from field: string code = 1;
+   */
+  code = "";
+
+  /**
+   * @generated from field: string value = 2;
+   */
+  value = "";
+
+  constructor(data?: PartialMessage<Choice>) {
+    super();
+    proto3.util.initPartial(data, this);
+  }
+
+  static readonly runtime: typeof proto3 = proto3;
+  static readonly typeName = "api.reference.v1.Choice";
+  static readonly fields: FieldList = proto3.util.newFieldList(() => [
+    { no: 1, name: "code", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+    { no: 2, name: "value", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+  ]);
+
+  static fromBinary(bytes: Uint8Array, options?: Partial<BinaryReadOptions>): Choice {
+    return new Choice().fromBinary(bytes, options);
+  }
+
+  static fromJson(jsonValue: JsonValue, options?: Partial<JsonReadOptions>): Choice {
+    return new Choice().fromJson(jsonValue, options);
+  }
+
+  static fromJsonString(jsonString: string, options?: Partial<JsonReadOptions>): Choice {
+    return new Choice().fromJsonString(jsonString, options);
+  }
+
+  static equals(a: Choice | PlainMessage<Choice> | undefined, b: Choice | PlainMessage<Choice> | undefined): boolean {
+    return proto3.util.equals(Choice, a, b);
+  }
+}
+
+/**
+ * @generated from message api.reference.v1.ListProvincesResponse
+ */
+export class ListProvincesResponse extends Message<ListProvincesResponse> {
+  /**
+   * @generated from field: repeated api.reference.v1.Choice provinces = 1;
+   */
+  provinces: Choice[] = [];
+
+  constructor(data?: PartialMessage<ListProvincesResponse>) {
+    super();
+    proto3.util.initPartial(data, this);
+  }
+
+  static readonly runtime: typeof proto3 = proto3;
+  static readonly typeName = "api.reference.v1.ListProvincesResponse";
+  static readonly fields: FieldList = proto3.util.newFieldList(() => [
+    { no: 1, name: "provinces", kind: "message", T: Choice, repeated: true },
+  ]);
+
+  static fromBinary(bytes: Uint8Array, options?: Partial<BinaryReadOptions>): ListProvincesResponse {
+    return new ListProvincesResponse().fromBinary(bytes, options);
+  }
+
+  static fromJson(jsonValue: JsonValue, options?: Partial<JsonReadOptions>): ListProvincesResponse {
+    return new ListProvincesResponse().fromJson(jsonValue, options);
+  }
+
+  static fromJsonString(jsonString: string, options?: Partial<JsonReadOptions>): ListProvincesResponse {
+    return new ListProvincesResponse().fromJsonString(jsonString, options);
+  }
+
+  static equals(a: ListProvincesResponse | PlainMessage<ListProvincesResponse> | undefined, b: ListProvincesResponse | PlainMessage<ListProvincesResponse> | undefined): boolean {
+    return proto3.util.equals(ListProvincesResponse, a, b);
+  }
+}
+
+/**
+ * @generated from message api.reference.v1.ListCitiesResponse
+ */
+export class ListCitiesResponse extends Message<ListCitiesResponse> {
+  /**
+   * @generated from field: repeated api.reference.v1.Choice cities = 1;
+   */
+  cities: Choice[] = [];
+
+  constructor(data?: PartialMessage<ListCitiesResponse>) {
+    super();
+    proto3.util.initPartial(data, this);
+  }
+
+  static readonly runtime: typeof proto3 = proto3;
+  static readonly typeName = "api.reference.v1.ListCitiesResponse";
+  static readonly fields: FieldList = proto3.util.newFieldList(() => [
+    { no: 1, name: "cities", kind: "message", T: Choice, repeated: true },
+  ]);
+
+  static fromBinary(bytes: Uint8Array, options?: Partial<BinaryReadOptions>): ListCitiesResponse {
+    return new ListCitiesResponse().fromBinary(bytes, options);
+  }
+
+  static fromJson(jsonValue: JsonValue, options?: Partial<JsonReadOptions>): ListCitiesResponse {
+    return new ListCitiesResponse().fromJson(jsonValue, options);
+  }
+
+  static fromJsonString(jsonString: string, options?: Partial<JsonReadOptions>): ListCitiesResponse {
+    return new ListCitiesResponse().fromJsonString(jsonString, options);
+  }
+
+  static equals(a: ListCitiesResponse | PlainMessage<ListCitiesResponse> | undefined, b: ListCitiesResponse | PlainMessage<ListCitiesResponse> | undefined): boolean {
+    return proto3.util.equals(ListCitiesResponse, a, b);
+  }
+}
+

@@ -1,0 +1,4 @@
+version: v1
+name: buf.build/dots-credit-analytics/credit-analytics
+deps:
+  - buf.build/googleapis/googleapis

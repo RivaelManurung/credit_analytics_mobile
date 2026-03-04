@@ -1,0 +1,121 @@
+syntax = "proto3";
+
+package api.applicant.v1;
+
+import "google/api/annotations.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "credit-analytics-backend/api/applicant/v1;v1";
+option java_multiple_files = true;
+option java_package = "api.applicant.v1";
+
+service ApplicantService {
+  rpc ListApplicants (ListApplicantsRequest) returns (ListApplicantsResponse) {
+    option (google.api.http) = {
+      get: "/v1/applicants"
+    };
+  }
+  rpc CreateApplicant (CreateApplicantRequest) returns (Applicant) {
+    option (google.api.http) = {
+      post: "/v1/applicants",
+      body: "*"
+    };
+  }
+  rpc GetApplicant (GetApplicantRequest) returns (Applicant) {
+    option (google.api.http) = {
+      get: "/v1/applicants/{id}"
+    };
+  }
+  rpc UpdateApplicant (UpdateApplicantRequest) returns (Applicant) {
+    option (google.api.http) = {
+      put: "/v1/applicants/{id}",
+      body: "*"
+    };
+  }
+
+  rpc GetApplicantAttributes (GetApplicantAttributesRequest) returns (ApplicantAttributes) {
+    option (google.api.http) = {
+      get: "/v1/applicants/{applicant_id}/attributes"
+    };
+  }
+
+  rpc UpsertApplicantAttributes (UpsertApplicantAttributesRequest) returns (ApplicantAttributes) {
+    option (google.api.http) = {
+      post: "/v1/applicants/{applicant_id}/attributes",
+      body: "*"
+    };
+  }
+}
+
+message ApplicantAttribute {
+  string attribute_id = 1;
+  string value = 2;
+  string data_type = 3;
+  google.protobuf.Timestamp updated_at = 4;
+  string attribute_option_id = 5;
+}
+
+message Applicant {
+  string id = 1;
+  string applicant_type = 2;
+  string identity_number = 3;
+  string tax_id = 4;
+  string full_name = 5;
+  string birth_date = 6;
+  string establishment_date = 7;
+  repeated ApplicantAttribute attributes = 8;
+  google.protobuf.Timestamp created_at = 9;
+}
+
+message ApplicantAttributes {
+  repeated ApplicantAttribute attributes = 1;
+}
+
+message CreateApplicantRequest {
+  string applicant_type = 1;
+  string identity_number = 2;
+  string tax_id = 3;
+  string full_name = 4;
+  string birth_date = 5;
+  string establishment_date = 6;
+  repeated ApplicantAttribute attributes = 7;
+}
+
+message GetApplicantRequest {
+  string id = 1;
+}
+
+message GetApplicantAttributesRequest {
+  string applicant_id = 1;
+}
+
+message UpdateApplicantRequest {
+  string id = 1;
+  string applicant_type = 2;
+  string identity_number = 3;
+  string tax_id = 4;
+  string full_name = 5;
+  string birth_date = 6;
+  string establishment_date = 7;
+  repeated ApplicantAttribute attributes = 8;
+}
+
+message ListApplicantsRequest {
+  // Cursor dari response sebelumnya (opaque token).
+  string cursor = 1;
+  // Jumlah data per halaman.
+  int32 page_size = 2;
+}
+
+message ListApplicantsResponse {
+  repeated Applicant applicants = 1;
+  // Token untuk mengambil halaman berikutnya (opaque token).
+  string next_cursor = 2;
+  // Flag apakah ada halaman berikutnya.
+  bool has_next = 3;
+}
+
+message UpsertApplicantAttributesRequest {
+  string applicant_id = 1;
+  repeated ApplicantAttribute attributes = 2;
+}

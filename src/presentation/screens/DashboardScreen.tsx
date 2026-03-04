@@ -1,5 +1,5 @@
 import React, { useMemo, useCallback } from 'react';
-import { View, Text, ScrollView, RefreshControl, ActivityIndicator, TouchableOpacity, Dimensions } from 'react-native';
+import { View, Text, ScrollView, RefreshControl, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { SidebarLayout } from '../components/Layout/SidebarLayout';
 import { User, ClipboardList, CheckCircle, Info, ChevronRight, Search } from 'lucide-react-native';
 import { useApplications } from '../hooks/useApplications';
@@ -7,21 +7,20 @@ import { useMySurveys, useSurveyControl } from '../hooks/useSurveys';
 import { useAuth } from '../context/AuthContext';
 import { useAppNavigator } from '../context/NavigationContext';
 import { ApplicationMapper } from '../utils/ApplicationMapper';
-
-const { width } = Dimensions.get('window');
+import { COLORS, LAYOUT } from '../../constants';
 
 const STATUS_CONFIG: Record<string, any> = {
     // --- Survey Statuses ---
-    IN_PROGRESS: { label: 'Sedang Berjalan', color: '#2563EB', bg: 'bg-blue-50', dot: 'bg-blue-600' },
-    ASSIGNED: { label: 'Ditugaskan', color: '#D97706', bg: 'bg-amber-50', dot: 'bg-amber-600' },
-    START: { label: 'Mulai', color: '#7C3AED', bg: 'bg-purple-50', dot: 'bg-purple-600' },
-    SUBMITTED: { label: 'Dikirim', color: '#059669', bg: 'bg-emerald-50', dot: 'bg-emerald-600' },
-    VERIFIED: { label: 'Terverifikasi', color: '#10B981', bg: 'bg-teal-50', dot: 'bg-teal-600' },
+    IN_PROGRESS: { label: 'Sedang Berjalan', color: COLORS.status.inProgress.text, bg: 'bg-blue-50', dot: 'bg-blue-600' },
+    ASSIGNED: { label: 'Ditugaskan', color: COLORS.status.assigned.text, bg: 'bg-amber-50', dot: 'bg-amber-600' },
+    START: { label: 'Mulai', color: COLORS.status.start.text, bg: 'bg-purple-50', dot: 'bg-purple-600' },
+    SUBMITTED: { label: 'Dikirim', color: COLORS.status.submitted.text, bg: 'bg-emerald-50', dot: 'bg-emerald-600' },
+    VERIFIED: { label: 'Terverifikasi', color: COLORS.status.verified.text, bg: 'bg-teal-50', dot: 'bg-teal-600' },
 
     // --- Application Statuses (Fallback) ---
-    PENDING: { label: 'Menunggu', color: '#6B7280', bg: 'bg-slate-50', dot: 'bg-slate-400' },
-    APPROVED: { label: 'Disetujui', color: '#10B981', bg: 'bg-emerald-50', dot: 'bg-emerald-600' },
-    REJECTED: { label: 'Ditolak', color: '#e11d48', bg: 'bg-rose-50', dot: 'bg-rose-600' },
+    PENDING: { label: 'Menunggu', color: COLORS.status.pending.text, bg: 'bg-slate-50', dot: 'bg-slate-400' },
+    APPROVED: { label: 'Disetujui', color: COLORS.status.verified.text, bg: 'bg-emerald-50', dot: 'bg-emerald-600' },
+    REJECTED: { label: 'Ditolak', color: COLORS.status.rejected.text, bg: 'bg-rose-50', dot: 'bg-rose-600' },
 };
 
 export function DashboardScreen() {

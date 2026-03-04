@@ -1,0 +1,181 @@
+syntax = "proto3";
+
+package api.decision.v1;
+
+import "google/api/annotations.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "credit-analytics-backend/api/decision/v1;v1";
+option java_multiple_files = true;
+option java_package = "api.decision.v1";
+
+service CommitteeService {
+  rpc CreateCommitteeSession (CreateCommitteeSessionRequest) returns (CommitteeSession) {
+    option (google.api.http) = {
+      post: "/v1/committee/sessions",
+      body: "*"
+    };
+  }
+  rpc GetCommitteeSession (GetCommitteeSessionRequest) returns (CommitteeSession) {
+    option (google.api.http) = {
+      get: "/v1/committee/sessions/{id}"
+    };
+  }
+  rpc SubmitCommitteeVote (SubmitCommitteeVoteRequest) returns (CommitteeVote) {
+    option (google.api.http) = {
+      post: "/v1/committee/sessions/{committee_session_id}/votes",
+      body: "*"
+    };
+  }
+  rpc FinalizeCommitteeDecision (FinalizeCommitteeDecisionRequest) returns (CommitteeDecision) {
+    option (google.api.http) = {
+      post: "/v1/committee/sessions/{committee_session_id}/finalize",
+      body: "*"
+    };
+  }
+  rpc ListCommitteeSessionsByApplication (ListCommitteeSessionsByApplicationRequest) returns (ListCommitteeSessionsResponse) {
+    option (google.api.http) = {
+      get: "/v1/applications/{application_id}/committee-sessions"
+    };
+  }
+}
+
+service DecisionService {
+  rpc RecordFinalDecision (RecordFinalDecisionRequest) returns (ApplicationDecision) {
+    option (google.api.http) = {
+      post: "/v1/applications/{application_id}/final-decision",
+      body: "*"
+    };
+  }
+  rpc GetApplicationDecision (GetApplicationDecisionRequest) returns (ApplicationDecision) {
+    option (google.api.http) = {
+      get: "/v1/applications/{application_id}/decision"
+    };
+  }
+  rpc AddDecisionCondition (AddDecisionConditionRequest) returns (DecisionCondition) {
+    option (google.api.http) = {
+      post: "/v1/applications/{application_id}/decision-conditions",
+      body: "*"
+    };
+  }
+  rpc ListDecisionConditions (ListDecisionConditionsRequest) returns (ListDecisionConditionsResponse) {
+    option (google.api.http) = {
+      get: "/v1/applications/{application_id}/decision-conditions"
+    };
+  }
+}
+
+message CommitteeSession {
+  string id = 1;
+  string application_id = 2;
+  int32 session_sequence = 3;
+  string status = 4;
+  google.protobuf.Timestamp scheduled_at = 5;
+  google.protobuf.Timestamp started_at = 6;
+  google.protobuf.Timestamp completed_at = 7;
+}
+
+message CommitteeVote {
+  string id = 1;
+  string committee_session_id = 2;
+  string user_id = 3;
+  string vote = 4;
+  string vote_reason = 5;
+  google.protobuf.Timestamp voted_at = 6;
+}
+
+message CommitteeDecision {
+  string id = 1;
+  string committee_session_id = 2;
+  string decision = 3;
+  string decision_reason = 4;
+  string approved_amount = 5;
+  int32 approved_tenor = 6;
+  string approved_interest_rate = 7;
+  bool requires_next_committee = 8;
+  google.protobuf.Timestamp decided_at = 9;
+}
+
+message ApplicationDecision {
+  string id = 1;
+  string application_id = 2;
+  string decision = 3;
+  string decision_source = 4;
+  string final_amount = 5;
+  int32 final_tenor = 6;
+  string final_interest_rate = 7;
+  string decision_reason = 8;
+  string decided_by = 9;
+  google.protobuf.Timestamp decided_at = 10;
+}
+
+message DecisionCondition {
+  string id = 1;
+  string application_id = 2;
+  string condition_text = 3;
+  bool is_met = 4;
+  google.protobuf.Timestamp created_at = 5;
+}
+
+message CreateCommitteeSessionRequest {
+  string application_id = 1;
+  int32 session_sequence = 2;
+  google.protobuf.Timestamp scheduled_at = 3;
+}
+
+message GetCommitteeSessionRequest {
+  string id = 1;
+}
+
+message SubmitCommitteeVoteRequest {
+  string committee_session_id = 1;
+  string user_id = 2;
+  string vote = 3;
+  string vote_reason = 4;
+}
+
+message FinalizeCommitteeDecisionRequest {
+  string committee_session_id = 1;
+  string decision = 2;
+  string decision_reason = 3;
+  string approved_amount = 4;
+  int32 approved_tenor = 5;
+  string approved_interest_rate = 6;
+  bool requires_next_committee = 7;
+}
+
+message ListCommitteeSessionsByApplicationRequest {
+  string application_id = 1;
+}
+
+message ListCommitteeSessionsResponse {
+  repeated CommitteeSession sessions = 1;
+}
+
+message RecordFinalDecisionRequest {
+  string application_id = 1;
+  string decision = 2;
+  string decision_source = 3;
+  string final_amount = 4;
+  int32 final_tenor = 5;
+  string final_interest_rate = 6;
+  string decision_reason = 7;
+  string decided_by = 8;
+}
+
+message GetApplicationDecisionRequest {
+  string application_id = 1;
+}
+
+message AddDecisionConditionRequest {
+  string application_id = 1;
+  string condition_text = 2;
+}
+
+message ListDecisionConditionsRequest {
+  string application_id = 1;
+}
+
+message ListDecisionConditionsResponse {
+  repeated DecisionCondition conditions = 1;
+}

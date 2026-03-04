@@ -1,0 +1,342 @@
+syntax = "proto3";
+
+package api.survey.v1;
+
+import "google/api/annotations.proto";
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
+
+option go_package = "credit-analytics-backend/api/survey/v1;v1";
+option java_multiple_files = true;
+option java_package = "api.survey.v1";
+
+service SurveyService {
+
+  // ===== ASSIGN & GET =====
+  rpc AssignSurvey (AssignSurveyRequest) returns (ApplicationSurvey) {
+    option (google.api.http) = {
+      post: "/v1/applications/{application_id}/surveys"
+      body: "*"
+    };
+  }
+
+  rpc GetSurvey (GetSurveyRequest) returns (ApplicationSurvey) {
+    option (google.api.http) = {
+      get: "/v1/surveys/{id}"
+    };
+  }
+
+  // ===== LIST BY APPLICATION =====
+  rpc ListSurveysByApplication (ListSurveysByApplicationRequest) returns (ListSurveysByApplicationResponse) {
+    option (google.api.http) = {
+      get: "/v1/applications/{application_id}/surveys"
+    };
+  }
+
+  // ===== GLOBAL LIST (Mobile App / Backend Filter) =====
+  rpc ListSurveys (ListSurveysRequest) returns (ListSurveysResponse) {
+    option (google.api.http) = {
+      get: "/v1/surveys"
+    };
+  }
+
+  // ===== WORKFLOW =====
+  rpc StartSurvey (StartSurveyRequest) returns (ApplicationSurvey) {
+    option (google.api.http) = {
+      put: "/v1/surveys/{id}/start"
+      body: "*"
+    };
+  }
+
+  rpc SubmitSurvey (SubmitSurveyRequest) returns (ApplicationSurvey) {
+    option (google.api.http) = {
+      put: "/v1/surveys/{id}/submit"
+      body: "*"
+    };
+  }
+
+  rpc VerifySurvey (VerifySurveyRequest) returns (ApplicationSurvey) {
+    option (google.api.http) = {
+      put: "/v1/surveys/{id}/verify"
+      body: "*"
+    };
+  }
+
+  // ===== ANSWERS & EVIDENCE =====
+  rpc SubmitSurveyAnswer (SubmitSurveyAnswerRequest) returns (SurveyAnswer) {
+    option (google.api.http) = {
+      post: "/v1/surveys/{survey_id}/answers"
+      body: "*"
+    };
+  }
+
+  rpc UploadSurveyEvidence (UploadSurveyEvidenceRequest) returns (SurveyEvidence) {
+    option (google.api.http) = {
+      post: "/v1/surveys/{survey_id}/evidences"
+      body: "*"
+    };
+  }
+
+  // ===== TEMPLATES (Optional Admin/Setup) =====
+  rpc GetSurveyTemplate (GetSurveyTemplateRequest) returns (SurveyTemplate) {
+    option (google.api.http) = {
+      get: "/v1/survey-templates/{id}"
+    };
+  }
+
+  // ===== TEMPLATES (Optional Admin/Setup) =====
+  rpc ListSurveyTemplates (ListSurveyTemplatesRequest) returns (ListSurveyTemplatesResponse) {
+    option (google.api.http) = {
+      get: "/v1/survey-templates"
+    };
+  }
+
+  rpc CreateSurveyTemplate (CreateSurveyTemplateRequest) returns (SurveyTemplate) {
+    option (google.api.http) = {
+      post: "/v1/survey-templates"
+      body: "*"
+    };
+  }
+  
+  rpc CreateSurveySection (CreateSurveySectionRequest) returns (SurveySection) {
+    option (google.api.http) = {
+      post: "/v1/survey-templates/{template_id}/sections"
+      body: "*"
+    };
+  }
+
+  rpc CreateSurveyQuestion (CreateSurveyQuestionRequest) returns (SurveyQuestion) {
+    option (google.api.http) = {
+      post: "/v1/sections/{section_id}/questions"
+      body: "*"
+    };
+  }
+
+  rpc CreateSurveyQuestionOption (CreateSurveyQuestionOptionRequest) returns (SurveyQuestionOption) {
+    option (google.api.http) = {
+      post: "/v1/questions/{question_id}/options"
+      body: "*"
+    };
+  }
+  // ===== SECTIONS & QUESTIONS =====
+  rpc ListSurveySections (ListSurveySectionsRequest) returns (ListSurveySectionsResponse) {
+    option (google.api.http) = {
+      get: "/v1/survey-templates/{template_id}/sections"
+    };
+  }
+
+  rpc ListSurveyQuestions (ListSurveyQuestionsRequest) returns (ListSurveyQuestionsResponse) {
+    option (google.api.http) = {
+      get: "/v1/sections/{section_id}/questions"
+    };
+  }
+}
+
+//////////////////////////////////////////////////////////
+// MODELS
+//////////////////////////////////////////////////////////
+
+message SurveyTemplate {
+  string id = 1;
+  string template_code = 2;
+  string template_name = 3;
+  string applicant_type = 4;
+  string product_id = 5;
+  bool active = 6;
+  repeated SurveySection sections = 7;
+}
+
+message SurveySection {
+  string id = 1;
+  string template_id = 2;
+  string section_name = 3;
+  int32 sequence = 4;
+  repeated SurveyQuestion questions = 5;
+}
+
+message SurveyQuestion {
+  string id = 1;
+  string section_id = 2;
+  string question_text = 3;
+  string answer_type = 4; // TEXT | NUMBER | BOOLEAN | DATE | OPTION
+  int32 sequence = 5;
+  bool is_required = 6;
+  repeated SurveyQuestionOption options = 7;
+}
+
+message SurveyQuestionOption {
+  string id = 1;
+  string question_id = 2;
+  string option_text = 3;
+  string option_value = 4;
+}
+
+message ApplicationSurvey {
+  string id = 1;
+  string application_id = 2;
+  string template_id = 3;
+  string survey_type = 4;
+  string status = 5; // UNASSIGNED | ASSIGNED | IN_PROGRESS | SUBMITTED | VERIFIED
+  string assigned_to = 6;
+  string survey_purpose = 7;
+
+  google.protobuf.Timestamp started_at = 8;
+  google.protobuf.Timestamp submitted_at = 9;
+  string submitted_by = 10;
+  
+  // Enrichment (Optional): Membantu mobile app menampilkan data list tanpa hit API tambahan
+  string applicant_name = 11; 
+  string application_status = 12;
+  
+  // Progress (e.g., 2/15)
+  int32 total_questions = 13;
+  int32 answered_questions = 14;
+}
+
+message SurveyAnswer {
+  string id = 1;
+  string survey_id = 2;
+  string question_id = 3;
+
+  string answer_text = 4;
+  string answer_number = 5;
+  bool answer_boolean = 6;
+  string answer_date = 7;
+
+  google.protobuf.Timestamp answered_at = 8;
+}
+
+message SurveyEvidence {
+  string id = 1;
+  string survey_id = 2;
+  string evidence_type = 3;
+  string file_url = 4;
+  string description = 5;
+
+  google.protobuf.Timestamp captured_at = 6;
+}
+
+//////////////////////////////////////////////////////////
+// REQUEST & RESPONSE
+//////////////////////////////////////////////////////////
+
+message ListSurveysByApplicationRequest {
+  string application_id = 1;
+}
+
+message ListSurveysByApplicationResponse {
+  repeated ApplicationSurvey surveys = 1;
+}
+
+message ListSurveysRequest {
+  int32 page_size = 1;
+  string cursor = 2;
+
+  string status = 3;         // Filter: UNASSIGNED, ASSIGNED, dll
+  string application_id = 4; // Filter spesifik aplikasi
+  string assigned_to = 5;    // Filter Surveyor
+  string survey_type = 6;
+}
+
+message ListSurveysResponse {
+  repeated ApplicationSurvey surveys = 1;
+  string next_cursor = 2;
+  bool has_next = 3;
+}
+
+message StartSurveyRequest {
+  string id = 1;
+  string user_id = 2;
+}
+
+message SubmitSurveyRequest {
+  string id = 1;
+  string user_id = 2;
+}
+
+message VerifySurveyRequest {
+  string id = 1;
+  string user_id = 2;
+}
+
+message SubmitSurveyAnswerRequest {
+  string survey_id = 1;
+  string question_id = 2;
+
+  string answer_text = 3;
+  string answer_number = 4;
+  bool answer_boolean = 5;
+  string answer_date = 6;
+}
+
+message UploadSurveyEvidenceRequest {
+  string survey_id = 1;
+  string evidence_type = 2;
+  string file_url = 3;
+  string description = 4;
+}
+
+message AssignSurveyRequest {
+  string application_id = 1;
+  string template_id = 2;
+  string survey_type = 3;
+  string assigned_to = 4;
+  string survey_purpose = 5;
+}
+
+message GetSurveyRequest {
+  string id = 1;
+}
+
+message GetSurveyTemplateRequest {
+  string id = 1;
+}
+
+message ListSurveyTemplatesRequest {}
+message ListSurveySectionsRequest {
+  string template_id = 1;
+}
+
+message ListSurveySectionsResponse {
+  repeated SurveySection sections = 1;
+}
+
+message ListSurveyQuestionsRequest {
+  string section_id = 1;
+}
+
+message ListSurveyQuestionsResponse {
+  repeated SurveyQuestion questions = 1;
+}
+
+message ListSurveyTemplatesResponse {
+  repeated SurveyTemplate templates = 1;
+}
+
+message CreateSurveyTemplateRequest {
+  string template_code = 1;
+  string template_name = 2;
+  string applicant_type = 3;
+  string product_id = 4;
+  bool active = 5;
+}
+
+message CreateSurveySectionRequest {
+  string template_id = 1;
+  string section_name = 2;
+  int32 sequence = 3;
+}
+
+message CreateSurveyQuestionRequest {
+  string section_id = 1;
+  string question_text = 2;
+  string answer_type = 3;
+  int32 sequence = 4;
+  bool is_required = 5;
+}
+
+message CreateSurveyQuestionOptionRequest {
+  string question_id = 1;
+  string option_text = 2;
+  string option_value = 3;
+}
