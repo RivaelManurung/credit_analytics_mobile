@@ -19,32 +19,34 @@ export function SidebarContent({ onClose }: SidebarContentProps) {
         <View className="flex-1">
             <View className="flex-row justify-between items-center px-5 py-5 border-b border-white/10">
                 <View>
-                    <Text className="text-white text-2xl font-bold">CA Mobile</Text>
-                    <Text className="text-blue-100 text-sm mt-0.5">Survey Aplikasi</Text>
+                    <Text className="text-primary text-2xl font-bold">CA Mobile</Text>
+                    <Text className="text-primary text-sm mt-0.5">Survey Aplikasi</Text>
                 </View>
-                <TouchableOpacity onPress={onClose} className="p-1">
-                    <X color="#fff" size={24} />
+                <TouchableOpacity onPress={onClose} className="p-1"> 
+                    <X color="#1e39e5ff" size={24} />
                 </TouchableOpacity>
             </View>
+            {/* divider */}
+            <View className="border-b border-black/10 px-3" />
 
             <View className="mt-2">
                 <TouchableOpacity
                     className={`flex-row items-center py-4 px-5 ${currentScreen === 'Dashboard' ? 'bg-white/20' : ''}`}
                     onPress={() => handleNavigate('Dashboard')}
                 >
-                    <Home color="#fff" size={20} />
-                    <Text className="text-white text-base ml-4 font-medium">Dashboard</Text>
+                    <Home color="#000" size={20} />
+                    <Text className="text-black text-base ml-4 font-medium">Dashboard</Text>
                 </TouchableOpacity>
 
 
                 <TouchableOpacity className="flex-row items-center py-4 px-5">
-                    <Clock color="#fff" size={20} />
-                    <Text className="text-white text-base ml-4 font-medium">Riwayat Survey</Text>
+                    <Clock color="#000" size={20} />
+                    <Text className="text-black text-base ml-4 font-medium">Riwayat Survey</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity className="flex-row items-center py-4 px-5">
-                    <User color="#fff" size={20} />
-                    <Text className="text-white text-base ml-4 font-medium">Profil</Text>
+                    <User color="#000" size={20} />
+                    <Text className="text-black text-base ml-4 font-medium">Profil</Text>
                 </TouchableOpacity>
             </View>
 

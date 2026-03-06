@@ -30,14 +30,15 @@ export const ApplicationMapper = {
         const amount = app.loanAmount || AttributeUtils.getValue(app.attributes, 'loan_amount') || '0';
         const type = app.loanPurpose || AttributeUtils.getValue(app.attributes, 'loan_purpose') || 'Kredit';
 
-        // Applicant type comes from the Applicant entity, passed in from the caller
-        // Fallback to EAV attribute if available, otherwise leave as unknown
+        // Applicant type dari backend — digunakan apa adanya (PERSONAL, COMPANY, dll)
+        // Jangan di-format agar konsisten dengan availableFilters di Dashboard
         const rawType = applicantType
             || AttributeUtils.getValue(app.attributes, 'applicant_type')
             || '';
 
-        // Format: capitalize first letter (personal -> Personal, company -> Company)
-        const formattedType = rawType
+        // Label tampilan: hanya capitalize huruf pertama saja untuk keterbacaan UI
+        // tapi rawType tetap disimpan apa adanya untuk keperluan filter/logika
+        const displayType = rawType
             ? rawType.charAt(0).toUpperCase() + rawType.slice(1).toLowerCase()
             : '';
 
@@ -55,7 +56,7 @@ export const ApplicationMapper = {
             amount: `Rp ${Number(amount).toLocaleString('id-ID')}`,
             tenor: `${app.tenorMonths} Bulan`,
             type: type,
-            applicantType: formattedType ? `${formattedType} Survey` : 'Survey',
+            applicantType: displayType ? `${displayType} Survey` : 'Survey',
             raw: app
         };
     }

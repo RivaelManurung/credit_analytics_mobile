@@ -35,7 +35,7 @@ export function SidebarLayout({ children, headerTitle = 'CA Mobile Survey' }: Si
 
             {/* Sidebar Panel */}
             <View
-                className={`absolute top-0 bottom-0 bg-primary z-20 shadow-xl ${isSidebarOpen ? 'left-0' : '-left-full'}`}
+                className={`absolute top-0 bottom-0 bg-white z-20 shadow-xl ${isSidebarOpen ? 'left-0' : '-left-full'}`}
                 style={{
                     paddingTop: insets.top,
                     width: LAYOUT.window.width * 0.75

@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { Menu } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
+import { StatusBar } from 'react-native';
 interface HeaderProps {
     title: string;
     onMenuPress: () => void;
@@ -16,6 +16,10 @@ export function Header({ title, onMenuPress }: HeaderProps) {
             className="bg-primary flex-row items-center justify-between py-4 px-5 border-b border-primary/20"
             style={{ paddingTop: insets.top + 8 }}
         >
+            <StatusBar
+                barStyle="light-content"
+                className="bg-primary"
+            />
             <TouchableOpacity
                 onPress={onMenuPress}
                 activeOpacity={0.7}

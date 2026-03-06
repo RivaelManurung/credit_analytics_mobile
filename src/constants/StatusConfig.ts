@@ -11,18 +11,21 @@ export interface StatusStyle {
 }
 
 export const STATUS_CONFIG: Record<string, StatusStyle> = {
+    // ── Status resmi dari backend ────────────────────────────────────────────
+    // UNASSIGNED | ASSIGNED | IN_PROGRESS | SUBMITTED | VERIFIED
     IN_PROGRESS: { label: 'Sedang Berjalan', color: '#2563EB', bg: '#EFF6FF', dot: '#3B82F6' },
     ASSIGNED: { label: 'Ditugaskan', color: '#D97706', bg: '#FFFBEB', dot: '#F59E0B' },
-    START: { label: 'Mulai', color: '#7C3AED', bg: '#F5F3FF', dot: '#7C3AED' },
+    UNASSIGNED: { label: 'Belum Ditugaskan', color: '#6B7280', bg: '#F9FAFB', dot: '#9CA3AF' },
     SUBMITTED: { label: 'Dikirim', color: '#059669', bg: '#ECFDF5', dot: '#059669' },
     VERIFIED: { label: 'Terverifikasi', color: '#0D9488', bg: '#F0FDFA', dot: '#0D9488' },
     PENDING: { label: 'Menunggu', color: '#6B7280', bg: '#F9FAFB', dot: '#9CA3AF' },
     REJECTED: { label: 'Ditolak', color: '#E11D48', bg: '#FFF1F2', dot: '#E11D48' },
-    NEW: { label: 'Baru', color: '#64748B', bg: '#F1F5F9', dot: '#94A3B8' },
 };
 
 export function getStatusConfig(statusKey: string): StatusStyle {
-    return STATUS_CONFIG[statusKey] || STATUS_CONFIG.NEW;
+    // Default ke ASSIGNED jika status tidak dikenali — karena semua nasabah
+    // di dashboard sudah pasti ditugaskan dari backend.
+    return STATUS_CONFIG[statusKey] || STATUS_CONFIG.ASSIGNED;
 }
 
 /**

@@ -8,10 +8,12 @@ import {
     TouchableOpacity,
     TextInput,
     Animated,
+    Modal,
+    Pressable,
 } from 'react-native';
 
 import { SidebarLayout } from '../components/Layout/SidebarLayout';
-import { ChevronRight, Search, X, User } from 'lucide-react-native';
+import { ChevronRight, Search, X, User, Building2, ChevronDown } from 'lucide-react-native';
 
 import { useApplications } from '../hooks/useApplications';
 import { useMySurveys } from '../hooks/useSurveys';
@@ -19,19 +21,24 @@ import { useAuth } from '../context/AuthContext';
 import { useAppNavigator } from '../context/NavigationContext';
 
 import { ApplicationMapper } from '../utils/ApplicationMapper';
-import { applicantRepo } from '../../data/repositories';
+import { AttributeUtils } from '../utils/AttributeUtils';
+import { applicantRepo, applicationRepo } from '../../data/repositories';
 
 import { getStatusConfig } from '../../constants';
 
 import type { CustomerListItem } from '../types/customer';
-import type { Application } from '../../gen/application/v1/application_pb';
+import { Application } from '../../gen/application/v1/application_pb';
 import type { ApplicationSurvey } from '../../gen/survey/v1/survey_pb';
 
+type ApplicantFilter = string;
+// Sort order hanya menggunakan status yang diakui backend:
+// UNASSIGNED | ASSIGNED | IN_PROGRESS | SUBMITTED | VERIFIED
 const STATUS_SORT_ORDER: Record<string, number> = {
     IN_PROGRESS: 0,
-    START: 1,
-    ASSIGNED: 2,
-    NEW: 3,
+    ASSIGNED: 1,
+    SUBMITTED: 2,
+    VERIFIED: 3,
+    UNASSIGNED: 99,
 };
 
 export function DashboardScreen() {
@@ -40,7 +47,10 @@ export function DashboardScreen() {
     const { navigate } = useAppNavigator();
 
     const [searchQuery, setSearchQuery] = useState('');
+    const [applicantFilter, setApplicantFilter] = useState<ApplicantFilter>('ALL');
+    const [filterVisible, setFilterVisible] = useState(false);
     const [applicantTypeMap, setApplicantTypeMap] = useState<Record<string, string>>({});
+    const [extraApps, setExtraApps] = useState<Record<string, Application>>({});
 
     const applicationsQuery = useApplications();
     const surveysQuery = useMySurveys(surveyorId || '');
@@ -49,36 +59,103 @@ export function DashboardScreen() {
     const isRefreshing = applicationsQuery.isRefetching || surveysQuery.isRefetching;
 
     useEffect(() => {
+        const currentApps = applicationsQuery.data?.pages.flatMap(page => page.applications) || [];
+        const surveys = surveysQuery.data || [];
 
-        const apps =
-            applicationsQuery.data?.pages.flatMap(page => page.applications) || [];
+        // 1. Identifikasi aplikasi yang metadata-nya belum ada di list (pagination) atau extraApps
+        const missingAppIds = surveys
+            .map(s => s.applicationId)
+            .filter(id => !currentApps.find(a => a.id === id) && !extraApps[id]);
 
-        const uniqueIds =
-            [...new Set(apps.map(a => a.applicantId).filter(Boolean))];
+        if (missingAppIds.length > 0) {
+            Promise.all(missingAppIds.map(id => applicationRepo.getApplication(id).catch(() => null)))
+                .then(results => {
+                    const newAppsMap: Record<string, Application> = {};
+                    results.forEach(app => {
+                        if (app) newAppsMap[app.id] = app;
+                    });
+                    if (Object.keys(newAppsMap).length > 0) {
+                        setExtraApps(prev => ({ ...prev, ...newAppsMap }));
+                    }
+                });
+        }
 
-        const newIds = uniqueIds.filter(id => !applicantTypeMap[id]);
+        // 2. Kumpulkan semua applicantId dari SEMUA aplikasi yang kita punya
+        const allAvailableApps = [...currentApps, ...Object.values(extraApps)];
+        const uniqueIdsForType = [...new Set(
+            allAvailableApps
+                .map(a => a.applicantId || AttributeUtils.getValue(a.attributes, 'applicant_id'))
+                .filter(Boolean)
+        )];
 
-        if (newIds.length === 0) return;
+        const missingTypeIds = uniqueIdsForType.filter(id => !applicantTypeMap[id]);
 
-        Promise.all(
-            newIds.map(id =>
-                applicantRepo.getApplicant(id)
-                    .then(applicant => ({ id, type: applicant.type }))
-                    .catch(() => ({ id, type: '' })),
-            ),
-        ).then(results => {
+        if (missingTypeIds.length > 0) {
+            Promise.all(
+                missingTypeIds.map(id =>
+                    applicantRepo.getApplicant(id)
+                        .then(applicant => {
+                            let type = applicant.type || (applicant as any).applicantType || '';
 
-            const newMap: Record<string, string> = {};
+                            // Fallback 1: Cek details case
+                            if (!type && applicant.details?.case) {
+                                type = applicant.details.case === 'individual' ? 'PERSONAL' : 'COMPANY';
+                            }
 
-            results.forEach(r => {
-                newMap[r.id] = r.type;
+                            // Fallback 2: Cek attributes applicant (struktur berbeda dengan ApplicationAttribute)
+                            if (!type && applicant.attributes) {
+                                const attr = (applicant.attributes as any[]).find(a =>
+                                    (a.code === 'applicant_type' || a.id === 'applicant_type' || a.attributeId === 'applicant_type')
+                                );
+                                if (attr) {
+                                    type = typeof attr.value === 'string' ? attr.value : attr.value?.rawValue || '';
+                                }
+                            }
+
+                            if (!type) {
+                                console.log(`[DEBUG] Applicant ${id} type remains unknown. Details: ${applicant.details?.case}. Attrs:`, applicant.attributes.map(a => (a as any).code || (a as any).attributeId || a.id).join(', '));
+                            }
+
+                            return { id, type };
+                        })
+                        .catch(err => {
+                            console.log(`[DEBUG] Failed to fetch applicant ${id}:`, err);
+                            return { id, type: '' };
+                        }),
+                ),
+            ).then(results => {
+                const newTypeMap: Record<string, string> = {};
+                results.forEach(r => {
+                    if (r.type) newTypeMap[r.id] = r.type;
+                });
+                if (Object.keys(newTypeMap).length > 0) {
+                    setApplicantTypeMap(prev => ({ ...prev, ...newTypeMap }));
+                }
             });
+        }
+    }, [applicationsQuery.data, surveysQuery.data, extraApps]);
 
-            setApplicantTypeMap(prev => ({ ...prev, ...newMap }));
+    // Get unique applicant types straight from Backend the loaded data
+    const availableFilters = useMemo(() => {
+        const types = new Set<string>();
+        // Add default 'ALL' item
+        types.add('ALL');
 
+        Object.values(applicantTypeMap).forEach(type => {
+            if (type && type.trim() !== '') {
+                types.add(type);
+            }
         });
 
-    }, [applicationsQuery.data]);
+        return Array.from(types);
+    }, [applicantTypeMap]);
+
+    // Reset filter if current filter is not in available types anymore
+    useEffect(() => {
+        if (!availableFilters.includes(applicantFilter)) {
+            setApplicantFilter('ALL');
+        }
+    }, [availableFilters]);
 
     const customerList = useMemo((): CustomerListItem[] => {
 
@@ -88,44 +165,73 @@ export function DashboardScreen() {
         const surveys: ApplicationSurvey[] =
             surveysQuery.data || [];
 
-        const mapped: CustomerListItem[] = apps.map(app => {
+        // ── Sumber data utama adalah survey yang ditugaskan admin ──────────
+        // Iterate dari surveys (bukan dari apps), sehingga hanya nasabah yang
+        // sudah diassign admin ke surveyor ini yang muncul di dashboard.
+        // Status yang ditampilkan murni dari backend — tidak ada hardcode apapun.
 
-            const survey =
-                surveys.find(s => s.applicationId === app.id);
+        // Type helper: survey dijamin ada (bukan undefined) di list ini
+        type AssignedItem = Omit<CustomerListItem, 'survey'> & {
+            survey: ApplicationSurvey;
+            applicantType: string;
+        };
 
-            const applicantType =
-                applicantTypeMap[app.applicantId] || '';
+        const mapped: AssignedItem[] = surveys
+            .map((survey): AssignedItem | null => {
+                // Cari di list utama atau di extraApps
+                const app = apps.find(a => a.id === survey.applicationId) || extraApps[survey.applicationId];
+                if (!app) return null;
 
-            return {
-                app,
-                survey,
-                display: ApplicationMapper.toDisplay(app, applicantType),
-            };
+                const actualApplicantId = app.applicantId || AttributeUtils.getValue(app.attributes, 'applicant_id');
+                const applicantType = applicantTypeMap[actualApplicantId]
+                    || AttributeUtils.getValue(app.attributes, 'applicant_type')
+                    || '';
+                console.log('[MAP]', actualApplicantId, '=', applicantType);
 
-        });
+                return {
+                    app,
+                    survey,
+                    applicantType, // Sediakan raw type untuk filtering
+                    display: ApplicationMapper.toDisplay(app, applicantType),
+                };
+            })
+            .filter((item): item is AssignedItem => item !== null);
 
         const query = searchQuery.toLowerCase();
 
-        const filtered =
-            query.length > 0
-                ? mapped.filter(item =>
-                    item.display.applicantName.toLowerCase().includes(query) ||
-                    item.app.id.toLowerCase().includes(query),
-                )
-                : mapped;
+        const filtered = mapped.filter(item => {
+            const matchSearch = query.length === 0
+                || item.display.applicantName.toLowerCase().includes(query)
+                || item.app.id.toLowerCase().includes(query);
 
+            const rawType = item.applicantType || '';
+            const matchType = applicantFilter === 'ALL' || rawType.toLowerCase() === applicantFilter.toLowerCase();
+
+            if (applicantFilter !== 'ALL' && matchType) {
+                console.log(`[FILTER MATCH] Found ${item.display.applicantName} for type: ${applicantFilter}`);
+            }
+
+            return matchSearch && matchType;
+        });
+
+        if (applicantFilter !== 'ALL') {
+            console.log(`[FILTER SUMMARY] Filtered ${filtered.length} customers for type: ${applicantFilter}`);
+        }
+
+        // Urutkan berdasarkan status dari backend — murni dari data survey, tanpa hardcode
         return filtered.sort(
             (a, b) =>
-                (STATUS_SORT_ORDER[a.survey?.status || 'NEW'] ?? 99) -
-                (STATUS_SORT_ORDER[b.survey?.status || 'NEW'] ?? 99),
-        );
+                (STATUS_SORT_ORDER[a.survey.status] ?? 99) -
+                (STATUS_SORT_ORDER[b.survey.status] ?? 99),
+        ) as CustomerListItem[];
 
-    }, [applicationsQuery.data, surveysQuery.data, searchQuery, applicantTypeMap]);
+    }, [applicationsQuery.data, surveysQuery.data, searchQuery, applicantFilter, applicantTypeMap, extraApps]);
 
     const stats = useMemo(() => ({
 
+        // Total = jumlah survey yang ditugaskan admin ke surveyor ini
         total:
-            applicationsQuery.data?.pages.flatMap(p => p.applications).length || 0,
+            (surveysQuery.data || []).length,
 
         active:
             (surveysQuery.data || []).filter(s => s.status === 'IN_PROGRESS').length,
@@ -135,7 +241,7 @@ export function DashboardScreen() {
                 ['SUBMITTED', 'VERIFIED'].includes(s.status),
             ).length,
 
-    }), [applicationsQuery.data, surveysQuery.data]);
+    }), [surveysQuery.data]);
 
     const handleAction = (item: CustomerListItem) => {
 
@@ -244,14 +350,42 @@ export function DashboardScreen() {
 
                         </View>
 
-                        <Text style={{
-                            fontSize: 16,
-                            fontWeight: '700',
-                            color: '#0F172A',
+                        <View style={{
+                            flexDirection: 'row',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
                             marginBottom: 12
                         }}>
-                            Daftar Nasabah
-                        </Text>
+                            <Text style={{
+                                fontSize: 16,
+                                fontWeight: '700',
+                                color: '#0F172A'
+                            }}>
+                                Daftar Nasabah
+                            </Text>
+
+                            <TouchableOpacity
+                                onPress={() => setFilterVisible(true)}
+                                style={{
+                                    flexDirection: 'row',
+                                    alignItems: 'center',
+                                    backgroundColor: '#F1F5F9',
+                                    paddingHorizontal: 12,
+                                    paddingVertical: 8,
+                                    borderRadius: 8,
+                                    gap: 6
+                                }}
+                            >
+                                <Text style={{
+                                    fontSize: 12,
+                                    fontWeight: '600',
+                                    color: '#0F172A'
+                                }}>
+                                    {applicantFilter === 'ALL' ? 'Semua' : applicantFilter}
+                                </Text>
+                                <ChevronDown size={14} color="#64748B" />
+                            </TouchableOpacity>
+                        </View>
 
                         {showSkeletons && (
                             <>
@@ -305,6 +439,69 @@ export function DashboardScreen() {
 
             />
 
+            <Modal
+                visible={filterVisible}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setFilterVisible(false)}
+            >
+                <TouchableOpacity
+                    style={{
+                        flex: 1,
+                        backgroundColor: 'rgba(0,0,0,0.4)',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                    }}
+                    activeOpacity={1}
+                    onPress={() => setFilterVisible(false)}
+                >
+                    <View style={{
+                        backgroundColor: '#FFF',
+                        borderRadius: 16,
+                        width: '80%',
+                        padding: 20,
+                        shadowColor: '#000',
+                        shadowOpacity: 0.1,
+                        shadowRadius: 10,
+                        shadowOffset: { width: 0, height: 4 },
+                        elevation: 5
+                    }}>
+                        <Text style={{ fontSize: 16, fontWeight: '700', marginBottom: 16, color: '#0F172A' }}>
+                            Tipe Nasabah
+                        </Text>
+                        {availableFilters.map((type, index) => (
+                            <TouchableOpacity
+                                key={type}
+                                style={{
+                                    paddingVertical: 14,
+                                    flexDirection: 'row',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    borderBottomWidth: index !== availableFilters.length - 1 ? 1 : 0,
+                                    borderBottomColor: '#F1F5F9'
+                                }}
+                                onPress={() => {
+                                    setApplicantFilter(type as any);
+                                    setFilterVisible(false);
+                                }}
+                            >
+                                <Text style={{
+                                    fontSize: 15,
+                                    color: applicantFilter === type ? '#2563EB' : '#0F172A',
+                                    fontWeight: applicantFilter === type ? '700' : '500',
+                                    textTransform: type === 'ALL' ? 'none' : 'capitalize'
+                                }}>
+                                    {type === 'ALL' ? 'Semua Nasabah' : type}
+                                </Text>
+                                {applicantFilter === type && (
+                                    <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#2563EB' }} />
+                                )}
+                            </TouchableOpacity>
+                        ))}
+                    </View>
+                </TouchableOpacity>
+            </Modal>
+
         </SidebarLayout>
 
     );
@@ -315,7 +512,9 @@ const CustomerCard = React.memo(
 
         const { display, survey, app } = item;
 
-        const statusKey = survey?.status || 'NEW';
+        // Survey selalu ada — hanya nasabah yang sudah diassign admin yang muncul di dashboard.
+        // Status diambil murni dari backend, tidak ada hardcode.
+        const statusKey = survey?.status ?? 'ASSIGNED';
 
         const config = getStatusConfig(statusKey);
 
@@ -374,7 +573,7 @@ const CustomerCard = React.memo(
                         color: '#64748B',
                         marginTop: 3
                     }}>
-                        {display.amount}
+                        {display.amount} • {display.applicantType}
                     </Text>
 
                 </View>

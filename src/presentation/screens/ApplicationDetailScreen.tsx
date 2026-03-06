@@ -14,7 +14,7 @@ import { useMySurveys, useSurveyControl } from '../hooks/useSurveys';
 import { useAuth } from '../context/AuthContext';
 import { useAppNavigator } from '../context/NavigationContext';
 import { ApplicationMapper, DisplayApplication } from '../utils/ApplicationMapper';
-import { COLORS, getStatusConfig, APP_CONFIG } from '../../constants';
+import { COLORS, getStatusConfig } from '../../constants';
 import type { StatusStyle } from '../../constants';
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -27,7 +27,7 @@ export function ApplicationDetailScreen() {
 
     const appQuery = useApplicationDetail(applicationId);
     const surveysQuery = useMySurveys(surveyorId || '');
-    const { startSurvey, assignSurvey, loading: actionLoading } = useSurveyControl();
+    const { startSurvey, loading: actionLoading } = useSurveyControl();
 
     const app = appQuery.data;
     const applicantQuery = useApplicant(app?.applicantId || '');
@@ -37,9 +37,16 @@ export function ApplicationDetailScreen() {
         [surveysQuery.data, applicationId],
     );
 
+    // Resolusi tipe nasabah murni dari backend (cek field type, applicantType, atau struktur details)
+    const applicant = applicantQuery.data;
+    let rawApplicantType = applicant?.type || (applicant as any)?.applicantType || '';
+    if (!rawApplicantType && applicant?.details.case) {
+        rawApplicantType = applicant.details.case === 'individual' ? 'PERSONAL' : 'COMPANY';
+    }
+
     const display: DisplayApplication | null = useMemo(
-        () => app ? ApplicationMapper.toDisplay(app, applicantQuery.data?.type || '') : null,
-        [app, applicantQuery.data],
+        () => app ? ApplicationMapper.toDisplay(app, rawApplicantType) : null,
+        [app, rawApplicantType],
     );
 
     // ── Action Handler ───────────────────────────────────────────────────
@@ -47,22 +54,22 @@ export function ApplicationDetailScreen() {
         if (!surveyorId || !applicationId) return;
 
         try {
-            let activeSurvey = survey;
-            if (!activeSurvey) {
-                activeSurvey = await assignSurvey(
-                    applicationId,
-                    APP_CONFIG.DEFAULT_TEMPLATE_ID,
-                    'FIELD_SURVEY',
-                    surveyorId,
-                    'Survey Lapangan Langsung',
+            // Survey selalu datang dari backend — jangan assign ulang dari sini.
+            // Jika survey tidak ditemukan, kemungkinan data belum termuat.
+            if (!survey) {
+                Alert.alert(
+                    'Survey Belum Tersedia',
+                    'Survey untuk nasabah ini belum ditemukan. Pastikan sudah ditugaskan dari sistem dan coba refresh halaman.',
                 );
+                return;
             }
-            if (activeSurvey && activeSurvey.status === 'ASSIGNED') {
-                await startSurvey(activeSurvey.id, surveyorId);
+
+            // Jika status ASSIGNED, mulai survey dahulu sebelum buka form
+            if (survey.status === 'ASSIGNED') {
+                await startSurvey(survey.id, surveyorId);
             }
-            if (activeSurvey) {
-                navigate('SurveyForm', { surveyId: activeSurvey.id, applicationId });
-            }
+
+            navigate('SurveyForm', { surveyId: survey.id, applicationId });
         } catch (err) {
             console.error('[Detail] Action Error:', err);
             Alert.alert('Gagal', 'Terjadi kesalahan saat memulai survey.');
@@ -103,7 +110,9 @@ export function ApplicationDetailScreen() {
         );
     }
 
-    const statusKey = survey?.status || display.status || 'PENDING';
+    // Status dari survey backend — fallback ke ASSIGNED (bukan PENDING/NEW)
+    // karena nasabah yang muncul di dashboard sudah pasti ditugaskan.
+    const statusKey = survey?.status || 'ASSIGNED';
     const config: StatusStyle = getStatusConfig(statusKey);
     const isCompleted = ['SUBMITTED', 'VERIFIED'].includes(statusKey);
 
