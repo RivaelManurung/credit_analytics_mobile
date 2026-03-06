@@ -1,964 +1,643 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
-    View, Text, ScrollView, TouchableOpacity, ActivityIndicator,
+    View, Text, ScrollView, TouchableOpacity, Image, ActivityIndicator,
     TextInput, Alert, BackHandler, StyleSheet, Dimensions,
-    Modal, FlatList, Pressable,
+    Modal, FlatList, Pressable, Platform, PermissionsAndroid,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
-    ArrowLeft, ClipboardList, CheckCircle2, ChevronRight,
-    CheckCircle, Loader2, Send, RefreshCw, AlertCircle,
-    FileText, Hash, Lock, ChevronDown, Camera, Image as ImageIcon,
+    ArrowLeft, CheckCircle2, ChevronRight, CheckCircle,
+    Send, RefreshCw, AlertCircle, Lock,
+    ChevronDown, Camera, X, ClipboardList,
 } from 'lucide-react-native';
 import { useSurveyControl } from '../hooks/useSurveys';
 import { useAuth } from '../context/AuthContext';
-import { SurveyRepositoryImpl } from '../../data/repositories/SurveyRepositoryImpl';
+import { useSurveyForm } from '../hooks/useSurveyForm';
+import { launchCamera } from 'react-native-image-picker';
+import { debounce } from '../utils/debounce';
+import { COLORS } from '../../constants';
 
-const repo = new SurveyRepositoryImpl();
-const { width: SCREEN_W } = Dimensions.get('window');
+const { width: SW, height: SH } = Dimensions.get('window');
 
-// ─── Premium Color Palette ──────────────────────────────────────────────────
-const C = {
-    bg: '#F8FAFC',     // slate-50
-    card: '#FFFFFF',
-    primary: '#2563EB',
-    primaryL: '#EFF6FF',
-    primaryD: '#1E40AF',
-    accent: '#7C3AED',
-    accentL: '#F5F3FF',
-    success: '#059669',
-    successL: '#ECFDF5',
-    danger: '#E11D48',
-    dangerL: '#FFF1F2',
-    warn: '#D97706',
-    warnL: '#FFFBEB',
-    dark: '#0F172A',
-    text: '#1E293B',
-    sub: '#64748B',
-    muted: '#94A3B8',
-    border: '#E2E8F0',
-    borderL: '#F1F5F9',
-    white: '#FFFFFF',
-};
-
+// ════════════════════════════════════════════════════════════════════════════
+// TYPES & STATE MACHINE
+// ════════════════════════════════════════════════════════════════════════════
 interface Props {
     surveyId: string;
     applicationId: string;
     onBack: () => void;
 }
 
+type MachineState = 'loading' | 'error' | 'sections' | 'question' | 'submitting' | 'success';
+
+// ════════════════════════════════════════════════════════════════════════════
+// MAIN COMPONENT
+// ════════════════════════════════════════════════════════════════════════════
 export function SurveyFormScreen({ surveyId, applicationId, onBack }: Props) {
     const insets = useSafeAreaInsets();
     const { surveyorId } = useAuth();
-    const { startSurvey, submitSurvey, submitSurveyAnswer, loading: actionLoading } = useSurveyControl();
+    const { startSurvey, submitSurvey, submitSurveyAnswer } = useSurveyControl();
 
-    const [survey, setSurvey] = useState<any>(null);
-    const [sections, setSections] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState('');
+    // Custom hook for data fetching (React Query)
+    const { survey, sections, rawAnswers, isLoading, isError, error, refetch } = useSurveyForm(surveyId, applicationId);
+
+    // State Machine
+    const [machine, setMachine] = useState<MachineState>('loading');
     const [currentSection, setCurrentSection] = useState<any>(null);
     const [qIdx, setQIdx] = useState(0);
     const [answers, setAnswers] = useState<Record<string, any>>({});
-    const [saving, setSaving] = useState(false);
-    const [retryKey, setRetryKey] = useState(0);
-    const [localTxt, setLocalTxt] = useState('');
-    const [pickerOpen, setPickerOpen] = useState(false);
+    const [lightbox, setLightbox] = useState<{ uris: string[]; index: number } | null>(null);
 
-    // Sync localTxt saat pindah pertanyaan
+    // Debounced API call to prevent spamming server
+    const debouncedSave = useMemo(
+        () => debounce(async (qId: string, payload: any) => {
+            try {
+                await submitSurveyAnswer(surveyId, qId, payload);
+            } catch (err) {
+                console.warn('[DebouncedSave Error]', err);
+            }
+        }, 800),
+        [surveyId, submitSurveyAnswer]
+    );
+
+    // Handle mapping initial answers when data is ready
     useEffect(() => {
-        if (currentSection) {
-            const q = currentSection.questions?.[qIdx];
-            if (q) setLocalTxt(answers[q.id] || '');
+        if (isLoading) {
+            setMachine('loading');
+            return;
         }
-    }, [currentSection, qIdx, answers]);
-
-    // ─── Fetch ──────────────────────────────────────────────────────────────
-    useEffect(() => {
-        let alive = true;
-        setLoading(true);
-        setError('');
-        console.log('[SF] fetch surveyId=%s applicationId=%s', surveyId, applicationId);
-
-        // Fetch surveys by applicationId untuk ambil templateId yang sesuai
-        repo.listSurveysByApplication(applicationId)
-            .then(async (surveys) => {
-                if (!alive) return;
-
-                const activeSurvey = surveys.find((s: any) => s.id === surveyId) ?? surveys[0];
-                if (!activeSurvey) throw new Error('Survey tidak ditemukan untuk nasabah ini.');
-
-                const derivedTemplateId = activeSurvey.templateId;
-                console.log('[SF] Found survey. templateId=%s status=%s', derivedTemplateId, activeSurvey.status);
-
-                // Fetch sections + existing answers secara paralel
-                const [sec, ans] = await Promise.all([
-                    repo.listSurveySections(derivedTemplateId),
-                    repo.listSurveyAnswers(surveyId).catch(() => []),
-                ]);
-
-                if (!alive) return;
-                console.log('[SF] sections=%d answers=%d', sec.length, ans.length);
-
-                setSurvey(activeSurvey);
-                setSections(sec);
-
-                // Auto-start jika masih ASSIGNED
-                if (activeSurvey.status === 'ASSIGNED' && surveyorId) {
-                    startSurvey(surveyId, surveyorId).catch(console.error);
-                }
-
-                const initialAnswers: Record<string, any> = {};
-                const qTypes: Record<string, string> = {};
-                sec.forEach(s => (s.questions || []).forEach(q => { qTypes[q.id] = q.answerType; }));
-
-                console.log('[SF] Mapping answers. Total raw:', ans.length);
-                ans.forEach((a: any) => {
-                    const qId = a.questionId || a.question_id;
-                    if (!qId) return;
-
-                    const type = qTypes[qId];
-                    // Support camelCase dan snake_case dari backend
-                    const txt = a.answerText ?? a.answer_text;
-                    const num = a.answerNumber ?? a.answer_number;
-                    const boo = a.answerBoolean ?? a.answer_boolean;
-                    const dat = a.answerDate ?? a.answer_date;
-
-                    if (type === 'BOOLEAN') {
-                        initialAnswers[qId] = (boo === true || txt === 'true' || txt === '1');
-                    } else if (type === 'NUMBER') {
-                        initialAnswers[qId] = (num !== undefined && num !== null && num !== '') ? num : txt;
-                    } else if (type === 'DATE') {
-                        initialAnswers[qId] = (dat !== undefined && dat !== null && dat !== '') ? dat : txt;
-                    } else {
-                        initialAnswers[qId] = txt || num || String(boo ?? '');
-                    }
-                });
-
-                console.log('[SF] Initial Answers Loaded:', Object.keys(initialAnswers).length);
-                setAnswers(initialAnswers);
-                setLoading(false);
-            }).catch((e: any) => {
-                if (!alive) return;
-                console.error('[SF] Fetch error:', e);
-                setError(e?.message || 'Gagal memuat data survey.');
-                setLoading(false);
-            });
-
-        return () => { alive = false; };
-    }, [surveyId, applicationId, retryKey]);
-
-    useEffect(() => {
-        const h = () => {
-            if (currentSection) { onExitSection(); return true; }
-            onBack(); return true;
-        };
-        const sub = BackHandler.addEventListener('hardwareBackPress', h);
-        return () => sub.remove();
-    }, [currentSection, onBack]);
-
-    // ─── Stats ──────────────────────────────────────────────────────────────
-    const stats = useMemo(() => {
-        let totalQ = 0, doneQ = 0;
-        sections.forEach(s => {
-            const qs = s.questions || [];
-            totalQ += qs.length;
-            doneQ += qs.filter((q: any) => {
-                const ans = answers[q.id];
-                return ans !== undefined && ans !== null && ans !== '';
-            }).length;
-        });
-        return { totalQ, doneQ, pct: totalQ > 0 ? Math.round((doneQ / totalQ) * 100) : 0 };
-    }, [sections, answers]);
-
-    // ─── Handlers ───────────────────────────────────────────────────────────
-    const onAnswer = async (qId: string, val: any, type: string) => {
-        setAnswers(p => ({ ...p, [qId]: val }));
-        try {
-            setSaving(true);
-            const payload: any = {};
-            if (type === 'NUMBER') payload.number = String(val);
-            else if (type === 'BOOLEAN') payload.boolean = !!val;
-            else if (type === 'DATE') payload.date = val;
-            else payload.text = String(val);
-            await submitSurveyAnswer(surveyId, qId, payload);
-        } catch (e) { console.warn(e); }
-        finally { setSaving(false); }
-    };
-
-    const onNext = async () => {
-        if (!currentSection) return;
-        const qs = currentSection.questions || [];
-        const q = qs[qIdx];
-
-        // Simpan text input sebelum pindah
-        if (q.answerType !== 'BOOLEAN' && localTxt !== (answers[q.id] || '')) {
-            await onAnswer(q.id, localTxt, q.answerType);
-        }
-
-        const currentAns = answers[q?.id] ?? localTxt;
-        const hasAnswer = currentAns !== undefined && currentAns !== null && currentAns !== '';
-
-        if (!hasAnswer) {
-            Alert.alert('Belum Dijawab', 'Tolong berikan jawaban Anda sebelum melanjutkan.');
+        if (isError || !survey) {
+            setMachine('error');
             return;
         }
 
-        if (qIdx < qs.length - 1) setQIdx(qIdx + 1);
-        else setCurrentSection(null);
-    };
+        // Map answer types for formatting
+        const qTypes: Record<string, string> = {};
+        sections.forEach((sec: any) => (sec.questions || []).forEach((q: any) => { qTypes[q.id] = q.answerType; }));
 
-    const onExitSection = async () => {
-        const q = currentSection?.questions?.[qIdx];
-        if (q && q.answerType !== 'BOOLEAN' && localTxt !== (answers[q.id] || '')) {
-            await onAnswer(q.id, localTxt, q.answerType);
+        const initAnswers: Record<string, any> = {};
+        rawAnswers.forEach((a: any) => {
+            const qId = a.questionId ?? a.question_id;
+            if (!qId) return;
+            const type = qTypes[qId];
+            const txt = a.answerText ?? a.answer_text;
+            const num = a.answerNumber ?? a.answer_number;
+            const boo = a.answerBoolean ?? a.answer_boolean;
+            const dat = a.answerDate ?? a.answer_date;
+
+            if (type === 'BOOLEAN') initAnswers[qId] = (boo === true || txt === 'true');
+            else if (type === 'NUMBER') initAnswers[qId] = num ?? txt;
+            else if (type === 'DATE') initAnswers[qId] = dat ?? txt;
+            else if (type === 'IMAGE') initAnswers[qId] = txt ? txt.split(',').filter(Boolean) : [];
+            else initAnswers[qId] = txt ?? num ?? String(boo ?? '');
+        });
+
+        setAnswers(initAnswers);
+
+        // Start survey if assigned
+        if (survey.status === 'ASSIGNED' && surveyorId) {
+            startSurvey(surveyId, surveyorId).catch(console.error);
         }
-        setCurrentSection(null);
-    };
 
-    const onSubmit = async () => {
+        setMachine('sections');
+    }, [isLoading, isError, survey, sections, rawAnswers, surveyorId]); // eslint-disable-line
+
+    // Hardware back navigation logic based on state machine
+    useEffect(() => {
+        const handler = () => {
+            if (lightbox) { setLightbox(null); return true; }
+            if (machine === 'question') {
+                setCurrentSection(null);
+                setMachine('sections');
+                return true;
+            }
+            onBack();
+            return true;
+        };
+        const sub = BackHandler.addEventListener('hardwareBackPress', handler);
+        return () => sub.remove();
+    }, [lightbox, machine, onBack]);
+
+    // Cleanup debouncer on unmount
+    useEffect(() => {
+        return () => debouncedSave.cancel();
+    }, [debouncedSave]);
+
+    // Calculate progress stats (memoized)
+    const stats = useMemo(() => {
+        let total = 0, done = 0;
+        sections.forEach(s => {
+            const qs = s.questions ?? [];
+            total += qs.length;
+            done += qs.filter((q: any) => {
+                const a = answers[q.id];
+                return a !== undefined && a !== null && a !== '';
+            }).length;
+        });
+        return { total, done, pct: total > 0 ? Math.round((done / total) * 100) : 0 };
+    }, [sections, answers]);
+
+    // Action Handlers
+    const saveAnswer = useCallback((qId: string, val: any, type: string) => {
+        // Optimistic UI update
+        setAnswers(prev => ({ ...prev, [qId]: val }));
+
+        // Prepare DB payload
+        const payload: any = {};
+        if (type === 'NUMBER') payload.number = String(val);
+        else if (type === 'BOOLEAN') payload.boolean = !!val;
+        else if (type === 'DATE') payload.date = val;
+        else if (type === 'IMAGE') payload.text = Array.isArray(val) ? val.join(',') : val;
+        else payload.text = String(val);
+
+        // Debounce API call
+        debouncedSave(qId, payload);
+    }, [debouncedSave]);
+
+    const handleSelectSection = useCallback((sec: any) => {
+        setCurrentSection(sec);
+        setQIdx(0);
+        setMachine('question');
+    }, []);
+
+    const handleBackToSections = useCallback(() => {
+        setCurrentSection(null);
+        setMachine('sections');
+    }, []);
+
+    const handleSubmit = async () => {
+        setMachine('submitting');
         try {
             await submitSurvey(surveyId, surveyorId!);
+            setMachine('success');
             Alert.alert('Berhasil', 'Survey telah berhasil dikirim.', [{ text: 'OK', onPress: onBack }]);
-        } catch { Alert.alert('Gagal', 'Gagal mengirim survey. Silakan coba lagi.'); }
+        } catch {
+            setMachine('sections');
+            Alert.alert('Gagal', 'Gagal mengirim survey. Silakan coba lagi.');
+        }
     };
 
-    // ════════════════════════════════════════════════════════════════════════
-    // LOADING STATE
-    // ════════════════════════════════════════════════════════════════════════
-    if (loading) {
+    // Render logic by State Machine
+    if (machine === 'loading') return <LoadingView insets={insets} onBack={onBack} />;
+    if (machine === 'error') return <ErrorView error={error} onRetry={refetch} onBack={onBack} />;
+
+    if (machine === 'question' && currentSection) {
         return (
-            <View style={s.centerScreen}>
-                <View style={s.loadingIconWrap}>
-                    <View style={s.loadingIconInner}>
-                        <ActivityIndicator size="large" color={C.primary} />
-                    </View>
-                </View>
-                <Text style={s.loadingTitle}>Menyiapkan Form</Text>
-                <Text style={s.loadingSubtitle}>Mengambil data survey & template...</Text>
-                <TouchableOpacity onPress={onBack} style={s.ghostBtn}>
-                    <ArrowLeft color={C.sub} size={16} />
-                    <Text style={s.ghostBtnText}>Kembali</Text>
-                </TouchableOpacity>
-            </View>
+            <QuestionView
+                insets={insets}
+                section={currentSection}
+                qIdx={qIdx}
+                setQIdx={setQIdx}
+                answers={answers}
+                saveAnswer={saveAnswer}
+                onBack={handleBackToSections}
+                setLightbox={setLightbox}
+            />
         );
     }
 
-    // ════════════════════════════════════════════════════════════════════════
-    // ERROR STATE
-    // ════════════════════════════════════════════════════════════════════════
-    if (error || !survey) {
-        return (
-            <View style={s.centerScreen}>
-                <View style={[s.loadingIconWrap, { backgroundColor: C.dangerL }]}>
-                    <AlertCircle color={C.danger} size={40} strokeWidth={1.5} />
-                </View>
-                <Text style={s.errorTitle}>Gagal Memuat</Text>
-                <Text style={s.errorMsg}>{error || 'Data tidak ditemukan'}</Text>
-                <TouchableOpacity onPress={() => setRetryKey(k => k + 1)} style={s.primaryBtn}>
-                    <RefreshCw color={C.white} size={16} />
-                    <Text style={s.primaryBtnText}>Coba Lagi</Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={onBack} style={s.ghostBtn}>
-                    <ArrowLeft color={C.sub} size={16} />
-                    <Text style={s.ghostBtnText}>Kembali ke Dashboard</Text>
-                </TouchableOpacity>
-            </View>
-        );
-    }
-
-    // ════════════════════════════════════════════════════════════════════════
-    // QUESTION VIEW
-    // ════════════════════════════════════════════════════════════════════════
-    if (currentSection) {
-        const qs = currentSection.questions || [];
-        const q = qs[qIdx];
-        if (!q) { setCurrentSection(null); return null; }
-        const total = qs.length;
-        const pct = ((qIdx + 1) / total) * 100;
-        const isLast = qIdx === total - 1;
-
-        return (
-            <View style={{ flex: 1, backgroundColor: C.bg }}>
-                {/* Header */}
-                <View style={[s.qHeader, { paddingTop: insets.top + 12 }]}>
-                    <View style={s.qHeaderTop}>
-                        <TouchableOpacity onPress={onExitSection} style={s.qBackBtn}>
-                            <ArrowLeft color={C.text} size={20} strokeWidth={2.5} />
-                        </TouchableOpacity>
-
-                        <View style={s.qSectionLabel}>
-                            <Text style={s.qSectionLabelText}>
-                                {currentSection.sectionName}
-                            </Text>
-                        </View>
-
-                        <View style={s.qSaveIndicator}>
-                            {saving
-                                ? <ActivityIndicator size="small" color={C.primary} />
-                                : <CheckCircle size={18} color={C.success} strokeWidth={2.5} />}
-                        </View>
-                    </View>
-
-                    {/* Progress */}
-                    <View style={s.qProgressRow}>
-                        <Text style={s.qProgressLabel}>Pertanyaan {qIdx + 1} dari {total}</Text>
-                        <Text style={s.qProgressPct}>{Math.round(pct)}%</Text>
-                    </View>
-                    <View style={s.qProgressTrack}>
-                        <View style={[s.qProgressFill, { width: `${pct}%` }]} />
-                    </View>
-                </View>
-
-                {/* Question */}
-                <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 28, paddingBottom: 40 }}>
-                    <View style={s.qQuestionCard}>
-                        <View style={s.qQuestionNumWrap}>
-                            <Text style={s.qQuestionNum}>Q{qIdx + 1}</Text>
-                        </View>
-                        <Text style={s.qQuestionText}>{q.questionText}</Text>
-                    </View>
-
-                    {/* Answer Area */}
-                    <View style={{ marginTop: 28 }}>
-                        {q.answerType === 'BOOLEAN' ? (
-                            <View style={{ flexDirection: 'row', gap: 14 }}>
-                                {[{ v: true, label: 'Ya', icon: '✓' }, { v: false, label: 'Tidak', icon: '✗' }].map(opt => {
-                                    const active = answers[q.id] === opt.v;
-                                    const bg = active ? (opt.v ? C.success : C.danger) : C.card;
-                                    const border = active ? bg : C.border;
-                                    return (
-                                        <TouchableOpacity key={String(opt.v)}
-                                            onPress={() => onAnswer(q.id, opt.v, 'BOOLEAN')}
-                                            activeOpacity={0.7}
-                                            style={[s.boolBtn, { backgroundColor: bg, borderColor: border }]}>
-                                            <Text style={[s.boolIcon, { color: active ? C.white : C.muted }]}>{opt.icon}</Text>
-                                            <Text style={[s.boolLabel, { color: active ? C.white : C.sub }]}>{opt.label}</Text>
-                                        </TouchableOpacity>
-                                    );
-                                })}
-                            </View>
-                        ) : q.answerType === 'OPTION' || q.answerType === 'SELECT' ? (
-                            <View>
-                                <TouchableOpacity
-                                    activeOpacity={0.7}
-                                    onPress={() => setPickerOpen(true)}
-                                    style={s.pickerTrigger}>
-                                    <Text style={[s.pickerValue, !answers[q.id] && { color: C.muted }]}>
-                                        {q.options?.find((o: any) => o.optionValue === answers[q.id])?.optionLabel || 'Pilih jawaban...'}
-                                    </Text>
-                                    <ChevronDown color={C.sub} size={20} />
-                                </TouchableOpacity>
-
-                                <Modal visible={pickerOpen} transparent animationType="fade">
-                                    <Pressable style={s.modalOverlay} onPress={() => setPickerOpen(false)}>
-                                        <View style={s.pickerModal}>
-                                            <View style={s.pickerHeader}>
-                                                <Text style={s.pickerTitle}>Pilih Opsi</Text>
-                                            </View>
-                                            <FlatList
-                                                data={q.options || []}
-                                                keyExtractor={(o, i) => o.id || String(i)}
-                                                renderItem={({ item: opt }) => {
-                                                    const active = answers[q.id] === opt.optionValue;
-                                                    return (
-                                                        <TouchableOpacity
-                                                            onPress={() => {
-                                                                onAnswer(q.id, opt.optionValue, 'TEXT');
-                                                                setPickerOpen(false);
-                                                            }}
-                                                            style={[s.pickerItem, active && s.pickerItemActive]}>
-                                                            <Text style={[s.pickerItemText, active && s.pickerItemTextActive]}>
-                                                                {opt.optionLabel}
-                                                            </Text>
-                                                            {active && <CheckCircle size={16} color={C.primary} />}
-                                                        </TouchableOpacity>
-                                                    );
-                                                }}
-                                            />
-                                        </View>
-                                    </Pressable>
-                                </Modal>
-                            </View>
-                        ) : q.answerType === 'IMAGE' ? (
-                            <View>
-                                <TouchableOpacity
-                                    activeOpacity={0.7}
-                                    onPress={() => Alert.alert('Kamera', 'Fitur Live Capture akan segera tersedia.')}
-                                    style={s.imageBtn}>
-                                    <View style={s.imageBtnIcon}>
-                                        <Camera color={C.primary} size={32} />
-                                    </View>
-                                    <View>
-                                        <Text style={s.imageBtnTitle}>Ambil Foto Lapangan</Text>
-                                        <Text style={s.imageBtnSub}>Pastikan lokasi terang & jelas</Text>
-                                    </View>
-                                    <TouchableOpacity style={s.imageBtnPlus}>
-                                        <ImageIcon color={C.white} size={14} />
-                                    </TouchableOpacity>
-                                </TouchableOpacity>
-                            </View>
-                        ) : (
-                            <View style={s.textInputWrap}>
-                                <TextInput
-                                    style={s.textInput}
-                                    placeholder={q.answerType === 'NUMBER' ? "Masukkan angka saja..." : "Ketik jawaban Anda di sini..."}
-                                    placeholderTextColor={C.muted}
-                                    keyboardType={q.answerType === 'NUMBER' ? 'numeric' : 'default'}
-                                    multiline={q.answerType !== 'NUMBER'}
-                                    value={localTxt}
-                                    onChangeText={setLocalTxt}
-                                    onBlur={() => {
-                                        if (localTxt !== (answers[q.id] || '')) {
-                                            onAnswer(q.id, localTxt, q.answerType);
-                                        }
-                                    }}
-                                />
-                            </View>
-                        )}
-                    </View>
-                </ScrollView>
-
-                {/* Bottom Nav */}
-                <View style={s.qFooter}>
-                    <TouchableOpacity
-                        onPress={() => qIdx > 0 ? setQIdx(qIdx - 1) : onExitSection()}
-                        style={s.qPrevBtn} activeOpacity={0.7}>
-                        <ArrowLeft color={C.sub} size={20} strokeWidth={2.5} />
-                    </TouchableOpacity>
-
-                    {/* Next Button Style Updates */}
-                    {(() => {
-                        const q = qs[qIdx];
-                        const hasAns = answers[q?.id] !== undefined && answers[q?.id] !== '';
-                        return (
-                            <TouchableOpacity
-                                onPress={onNext}
-                                style={[
-                                    s.qNextBtn,
-                                    isLast && { backgroundColor: C.success },
-                                    !hasAns && { opacity: 0.5 }
-                                ]}
-                                activeOpacity={hasAns ? 0.8 : 1}
-                            >
-                                <Text style={s.qNextBtnText}>{isLast ? 'SELESAI' : 'LANJUT'}</Text>
-                                <ChevronRight color={C.white} size={18} strokeWidth={3} />
-                            </TouchableOpacity>
-                        );
-                    })()}
-                </View>
-            </View>
-        );
-    }
-
-    // ════════════════════════════════════════════════════════════════════════
-    // SECTION LIST (Main View)
-    // ════════════════════════════════════════════════════════════════════════
     return (
-        <View style={{ flex: 1, backgroundColor: C.bg }}>
-            <ScrollView
-                style={{ flex: 1 }}
-                contentContainerStyle={{ paddingBottom: 120 }}
-                showsVerticalScrollIndicator={false}
-            >
-                {/* Hero Header - Now Inside ScrollView */}
-                <View style={[s.heroWrap, { paddingTop: insets.top + 20 }]}>
-                    <View style={s.heroInner}>
-                        {/* Header Top Row: Back + Label */}
-                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 20 }}>
-                            <TouchableOpacity onPress={onBack} style={s.heroBackBtn} activeOpacity={0.7}>
-                                <ArrowLeft color={C.white} size={18} strokeWidth={3} />
-                            </TouchableOpacity>
-                            <Text style={[s.heroLabel, { marginBottom: 0, marginLeft: 12 }]}>SURVEY FORM</Text>
-                        </View>
-
-                        {/* Info Section Below */}
-                        <Text style={s.heroName}>{survey.applicantName || 'Applicant'}</Text>
-
-                        <View style={s.heroMeta}>
-                            <View style={s.heroBadge}>
-                                <Hash color="rgba(255,255,255,0.9)" size={12} strokeWidth={3} />
-                                <Text style={s.heroBadgeText}>{surveyId.substring(0, 8).toUpperCase()}</Text>
-                            </View>
-                        </View>
-
-                        {/* Overall Progress */}
-                        <View style={s.heroProgress}>
-                            <View style={s.heroProgressHeader}>
-                                <Text style={s.heroProgressLabel}>Progress Keseluruhan</Text>
-                                <Text style={s.heroProgressPct}>{stats.pct}%</Text>
-                            </View>
-                            <View style={s.heroProgressTrack}>
-                                <View style={[s.heroProgressFill, { width: `${stats.pct}%` }]} />
-                            </View>
-                            <Text style={s.heroProgressSub}>
-                                {stats.doneQ} dari {stats.totalQ} pertanyaan dijawab
-                            </Text>
-                        </View>
-                    </View>
-                </View>
-
-                {/* Section Cards Container */}
-                <View style={{ paddingHorizontal: 20, paddingTop: 10 }}>
-                    <View style={s.sectionHeader}>
-                        <View>
-                            <Text style={s.sectionTitle}>Daftar Bagian</Text>
-                            <Text style={s.sectionSub}>Klik untuk mulai mengisi</Text>
-                        </View>
-                        <View style={s.sectionCount}>
-                            <FileText color={C.primary} size={14} />
-                            <Text style={s.sectionCountText}>{sections.length}</Text>
-                        </View>
-                    </View>
-
-                    {sections.map((sec: any, idx: number) => {
-                        const qs = sec.questions || [];
-                        const done = qs.filter((q: any) => {
-                            const ans = answers[q.id];
-                            return ans !== undefined && ans !== null && ans !== '';
-                        }).length;
-                        const total = qs.length;
-                        const full = total > 0 && done === total;
-                        const pct = total > 0 ? Math.round((done / total) * 100) : 0;
-
-                        // Check if previous section is complete
-                        let isLocked = false;
-                        if (idx > 0) {
-                            const prevSec = sections[idx - 1];
-                            const prevQs = prevSec.questions || [];
-                            const prevDone = prevQs.filter((q: any) => {
-                                const ans = answers[q.id];
-                                return ans !== undefined && ans !== null && ans !== '';
-                            }).length;
-                            isLocked = prevDone < prevQs.length;
-                        }
-
-                        return (
-                            <TouchableOpacity key={sec.id || idx}
-                                onPress={() => {
-                                    if (isLocked) {
-                                        Alert.alert('Bagian Terkunci', 'Selesaikan bagian sebelumnya terlebih dahulu untuk membuka bagian ini.');
-                                        return;
-                                    }
-                                    setCurrentSection(sec);
-                                    setQIdx(0);
-                                }}
-                                activeOpacity={isLocked ? 1 : 0.7}
-                                style={[s.sectionCard, isLocked && { opacity: 0.6, borderColor: C.border }]}>
-
-                                {/* Left Icon */}
-                                <View style={[s.secIcon, { backgroundColor: isLocked ? C.borderL : (full ? C.successL : C.primaryL) }]}>
-                                    {isLocked ? (
-                                        <Lock color={C.muted} size={24} />
-                                    ) : (
-                                        full
-                                            ? <CheckCircle2 color={C.success} size={26} strokeWidth={2} />
-                                            : <ClipboardList color={C.primary} size={26} strokeWidth={2} />
-                                    )}
-                                </View>
-
-                                {/* Content */}
-                                <View style={{ flex: 1 }}>
-                                    <View style={s.secTopRow}>
-                                        <Text style={s.secLabel}>BAGIAN {idx + 1}</Text>
-                                        <Text style={[s.secStatus, { color: isLocked ? C.muted : (full ? C.success : C.primary) }]}>
-                                            {isLocked ? 'Terkunci' : (full ? '✓ Selesai' : `${done}/${total}`)}
-                                        </Text>
-                                    </View>
-                                    <Text style={[s.secName, isLocked && { color: C.muted }]}>{sec.sectionName}</Text>
-
-                                    {/* Mini progress */}
-                                    <View style={s.secProgressWrap}>
-                                        <View style={s.secProgressTrack}>
-                                            <View style={[
-                                                s.secProgressFill,
-                                                {
-                                                    width: `${pct}%`,
-                                                    backgroundColor: isLocked ? C.muted : (full ? C.success : C.primary)
-                                                },
-                                            ]} />
-                                        </View>
-                                        <Text style={[s.secProgressText, { color: full ? C.success : C.sub }]}>
-                                            {pct}%
-                                        </Text>
-                                    </View>
-                                </View>
-
-                                {isLocked ? null : <ChevronRight color={C.border} size={20} />}
-                            </TouchableOpacity>
-                        );
-                    })}
-                </View>
+        <View style={{ flex: 1, backgroundColor: COLORS.bg }}>
+            <ScrollView contentContainerStyle={{ paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
+                <SurveyHeader insets={insets} survey={survey} stats={stats} onBack={onBack} />
+                <SurveyProgress stats={stats} />
+                <SectionList sections={sections} answers={answers} onSelectSection={handleSelectSection} />
             </ScrollView>
 
-            {/* Submit Button */}
-            <View style={s.submitWrap}>
-                <TouchableOpacity onPress={onSubmit} activeOpacity={0.8}
-                    style={[s.submitBtn, stats.pct < 100 && { opacity: 0.6 }]}>
-                    {actionLoading
-                        ? <ActivityIndicator color={C.white} />
-                        : <>
-                            <Send color={C.white} size={18} />
-                            <Text style={s.submitBtnText}>Finalisasi Survey</Text>
-                        </>}
-                </TouchableOpacity>
-                {stats.pct < 100 && (
-                    <Text style={s.submitHint}>
-                        Selesaikan semua pertanyaan terlebih dahulu
-                    </Text>
-                )}
-            </View>
+            <SubmitFooter stats={stats} loading={machine === 'submitting'} onSubmit={handleSubmit} />
+
+            {lightbox && (
+                <ImageLightbox lightbox={lightbox} onClose={() => setLightbox(null)} />
+            )}
         </View>
     );
 }
 
 // ════════════════════════════════════════════════════════════════════════════
+// MEMOIZED SUB-COMPONENTS (Pure Rendering)
+// ════════════════════════════════════════════════════════════════════════════
+
+const LoadingView = React.memo(({ insets, onBack }: { insets: any, onBack: () => void }) => (
+    <View style={s.center}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+        <Text style={s.loadTitle}>Memuat Survey...</Text>
+        <TouchableOpacity onPress={onBack} style={s.linkBtn}>
+            <ArrowLeft color={COLORS.sub} size={15} />
+            <Text style={s.linkTxt}>Kembali</Text>
+        </TouchableOpacity>
+    </View>
+));
+
+const ErrorView = React.memo(({ error, onRetry, onBack }: { error: string, onRetry: () => void, onBack: () => void }) => (
+    <View style={s.center}>
+        <View style={[s.iconBox, { backgroundColor: COLORS.dangerL }]}>
+            <AlertCircle color={COLORS.danger} size={28} />
+        </View>
+        <Text style={s.errorTitle}>Gagal Memuat</Text>
+        <Text style={s.errorMsg}>{error || 'Data tidak ditemukan'}</Text>
+        <TouchableOpacity onPress={onRetry} style={s.btn}>
+            <RefreshCw color={COLORS.white} size={15} />
+            <Text style={s.btnTxt}>Coba Lagi</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={onBack} style={s.linkBtn}>
+            <ArrowLeft color={COLORS.sub} size={15} />
+            <Text style={s.linkTxt}>Kembali</Text>
+        </TouchableOpacity>
+    </View>
+));
+
+const SurveyHeader = React.memo(({ insets, survey, stats, onBack }: any) => (
+    <View style={[s.header, { paddingTop: insets.top + 16 }]}>
+        <TouchableOpacity onPress={onBack} style={s.backBtn}>
+            <ArrowLeft color={COLORS.text} size={20} />
+        </TouchableOpacity>
+        <View style={{ flex: 1, marginLeft: 12 }}>
+            <Text style={s.headerSub}>Survey Form</Text>
+            <Text style={s.headerTitle} numberOfLines={1}>{survey?.applicantName ?? 'Applicant'}</Text>
+        </View>
+        <View style={[s.badge, stats.pct === 100 && { backgroundColor: COLORS.successL }]}>
+            <Text style={[s.badgeTxt, stats.pct === 100 && { color: COLORS.success }]}>{stats.pct}%</Text>
+        </View>
+    </View>
+));
+
+const SurveyProgress = React.memo(({ stats }: any) => (
+    <View style={s.progCard}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 }}>
+            <Text style={s.progCardLabel}>Progress Keseluruhan</Text>
+            <Text style={s.progCardCount}>{stats.done}/{stats.total} dijawab</Text>
+        </View>
+        <View style={s.progTrackLg}>
+            <View style={[s.progFillLg, { width: `${stats.pct}%`, backgroundColor: stats.pct === 100 ? COLORS.success : COLORS.primary }]} />
+        </View>
+    </View>
+));
+
+const SectionList = React.memo(({ sections, answers, onSelectSection }: any) => {
+    return (
+        <View style={{ paddingHorizontal: 16 }}>
+            <Text style={s.listTitle}>Daftar Bagian</Text>
+            {sections.map((sec: any, idx: number) => {
+                const qs = sec.questions ?? [];
+                const done = qs.filter((q: any) => {
+                    const a = answers[q.id];
+                    return a !== undefined && a !== null && a !== '';
+                }).length;
+                const pct = qs.length > 0 ? Math.round((done / qs.length) * 100) : 0;
+                const full = qs.length > 0 && done === qs.length;
+
+                // Lock section if previous is not fully answered
+                const isLocked = idx > 0 && (() => {
+                    const prevQs = sections[idx - 1].questions ?? [];
+                    return prevQs.filter((q: any) => {
+                        const a = answers[q.id];
+                        return a !== undefined && a !== null && a !== '';
+                    }).length < prevQs.length;
+                })();
+
+                return (
+                    <TouchableOpacity key={sec.id ?? idx}
+                        onPress={() => {
+                            if (isLocked) {
+                                Alert.alert('Terkunci', 'Selesaikan bagian sebelumnya terlebih dahulu.');
+                                return;
+                            }
+                            onSelectSection(sec);
+                        }}
+                        activeOpacity={isLocked ? 1 : 0.7}
+                        style={[s.secCard, isLocked && { opacity: 0.5 }]}>
+
+                        <View style={[s.secIconBox, { backgroundColor: isLocked ? COLORS.border : full ? COLORS.successL : COLORS.primaryL }]}>
+                            {isLocked ? <Lock color={COLORS.muted} size={20} /> : full ? <CheckCircle2 color={COLORS.success} size={20} /> : <ClipboardList color={COLORS.primary} size={20} />}
+                        </View>
+
+                        <View style={{ flex: 1 }}>
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 3 }}>
+                                <Text style={s.secIdx}>Bagian {idx + 1}</Text>
+                                <Text style={[s.secStat, { color: isLocked ? COLORS.muted : full ? COLORS.success : COLORS.primary }]}>
+                                    {isLocked ? 'Terkunci' : full ? 'Selesai' : `${done}/${qs.length}`}
+                                </Text>
+                            </View>
+                            <Text style={[s.secName, isLocked && { color: COLORS.muted }]}>{sec.sectionName}</Text>
+                            <View style={s.secProg}>
+                                <View style={s.secProgTrack}>
+                                    <View style={[s.secProgFill, { width: `${pct}%`, backgroundColor: isLocked ? COLORS.muted : full ? COLORS.success : COLORS.primary }]} />
+                                </View>
+                                <Text style={s.secProgTxt}>{pct}%</Text>
+                            </View>
+                        </View>
+                        {!isLocked && <ChevronRight color={COLORS.muted} size={16} style={{ marginLeft: 8 }} />}
+                    </TouchableOpacity>
+                );
+            })}
+        </View>
+    );
+});
+
+const SubmitFooter = React.memo(({ stats, loading, onSubmit }: any) => (
+    <View style={s.submitWrap}>
+        <TouchableOpacity onPress={onSubmit} activeOpacity={0.8} style={[s.submitBtn, stats.pct < 100 && { opacity: 0.5 }]}>
+            {loading ? <ActivityIndicator color={COLORS.white} /> : <><Send color={COLORS.white} size={17} /><Text style={s.submitTxt}>Kirim Survey</Text></>}
+        </TouchableOpacity>
+        {stats.pct < 100 && (
+            <Text style={s.submitHint}>Selesaikan semua pertanyaan terlebih dahulu</Text>
+        )}
+    </View>
+));
+
+const QuestionView = React.memo(({ insets, section, qIdx, setQIdx, answers, saveAnswer, onBack, setLightbox }: any) => {
+    const qs = section.questions ?? [];
+    const q = qs[qIdx];
+    const isLast = qIdx === qs.length - 1;
+    const pct = ((qIdx + 1) / qs.length) * 100;
+
+    // Internal state for text input to not lag the UI
+    const [localTxt, setLocalTxt] = useState(answers[q?.id] ?? '');
+
+    // Sync localTxt when question changes
+    useEffect(() => {
+        setLocalTxt(answers[q?.id] ?? '');
+    }, [q?.id, answers]);
+
+    const handleNext = () => {
+        const hasAns = Array.isArray(answers[q.id]) ? answers[q.id].length > 0 : (answers[q.id] !== undefined && answers[q.id] !== null && String(answers[q.id]).trim() !== '');
+        if (!hasAns && String(localTxt).trim() === '') {
+            Alert.alert('Belum Dijawab', 'Tolong isi jawaban sebelum melanjutkan.');
+            return;
+        }
+        if (q.answerType !== 'BOOLEAN' && localTxt !== (answers[q.id] ?? '')) {
+            saveAnswer(q.id, localTxt, q.answerType);
+        }
+
+        if (!isLast) setQIdx((prev: number) => prev + 1);
+        else onBack();
+    };
+
+    if (!q) return null;
+
+    return (
+        <View style={{ flex: 1, backgroundColor: COLORS.bg }}>
+            <View style={[s.qHead, { paddingTop: insets.top + 10 }]}>
+                <View style={s.qHeadRow}>
+                    <TouchableOpacity onPress={onBack} style={s.iconBtn}>
+                        <ArrowLeft color={COLORS.text} size={20} />
+                    </TouchableOpacity>
+                    <Text style={s.qSectionName} numberOfLines={1}>{section.sectionName}</Text>
+                    <View style={s.iconBtn} />
+                </View>
+                <View style={s.progRow}>
+                    <Text style={s.progLabel}>{qIdx + 1} / {qs.length}</Text>
+                    <View style={s.progTrack}>
+                        <View style={[s.progFill, { width: `${pct}%` }]} />
+                    </View>
+                    <Text style={s.progPct}>{Math.round(pct)}%</Text>
+                </View>
+            </View>
+
+            <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 20, paddingBottom: 32 }}>
+                <View style={s.qCard}>
+                    <Text style={s.qNum}>Pertanyaan {qIdx + 1}</Text>
+                    <Text style={s.qText}>{q.questionText}</Text>
+                </View>
+
+                <View style={{ marginTop: 20 }}>
+                    <QuestionInput
+                        q={q}
+                        localTxt={localTxt}
+                        setLocalTxt={(val: string) => {
+                            setLocalTxt(val);
+                            saveAnswer(q.id, val, q.answerType);
+                        }}
+                        answers={answers}
+                        saveAnswer={saveAnswer}
+                        setLightbox={setLightbox}
+                    />
+                </View>
+            </ScrollView>
+
+            <View style={s.qFooter}>
+                <TouchableOpacity onPress={() => qIdx > 0 ? setQIdx((i: number) => i - 1) : onBack()} style={s.prevBtn}>
+                    <ArrowLeft color={COLORS.sub} size={20} />
+                </TouchableOpacity>
+                <TouchableOpacity onPress={handleNext} style={[s.nextBtn, isLast && { backgroundColor: COLORS.success }]}>
+                    <Text style={s.nextBtnTxt}>{isLast ? 'Selesai' : 'Lanjut'}</Text>
+                    <ChevronRight color={COLORS.white} size={18} />
+                </TouchableOpacity>
+            </View>
+        </View>
+    );
+});
+
+const QuestionInput = React.memo(({ q, localTxt, setLocalTxt, answers, saveAnswer, setLightbox }: any) => {
+    const [pickerOpen, setPickerOpen] = useState(false);
+
+    if (q.answerType === 'BOOLEAN') {
+        return (
+            <View style={{ flexDirection: 'row', gap: 12 }}>
+                {[{ v: true, label: 'Ya' }, { v: false, label: 'Tidak' }].map(opt => {
+                    const active = answers[q.id] === opt.v;
+                    const color = opt.v ? COLORS.success : COLORS.danger;
+                    return (
+                        <TouchableOpacity key={String(opt.v)}
+                            onPress={() => saveAnswer(q.id, opt.v, 'BOOLEAN')}
+                            style={[s.boolBtn, active && { backgroundColor: color, borderColor: color }]}>
+                            <Text style={[s.boolTxt, { color: active ? COLORS.white : COLORS.sub }]}>{opt.label}</Text>
+                        </TouchableOpacity>
+                    );
+                })}
+            </View>
+        );
+    }
+
+    if (q.answerType === 'OPTION' || q.answerType === 'SELECT') {
+        return (
+            <>
+                <TouchableOpacity onPress={() => setPickerOpen(true)} style={s.selectTrigger}>
+                    <Text style={[s.selectVal, !answers[q.id] && { color: COLORS.muted }]}>
+                        {q.options?.find((o: any) => o.optionValue === answers[q.id])?.optionLabel ?? 'Pilih jawaban...'}
+                    </Text>
+                    <ChevronDown color={COLORS.sub} size={18} />
+                </TouchableOpacity>
+                <Modal visible={pickerOpen} transparent animationType="slide">
+                    <Pressable style={s.overlay} onPress={() => setPickerOpen(false)}>
+                        <View style={s.sheet}>
+                            <Text style={s.sheetTitle}>Pilih Opsi</Text>
+                            <FlatList
+                                data={q.options ?? []}
+                                keyExtractor={(o, i) => o.id ?? String(i)}
+                                renderItem={({ item: opt }) => {
+                                    const active = answers[q.id] === opt.optionValue;
+                                    return (
+                                        <TouchableOpacity
+                                            onPress={() => { saveAnswer(q.id, opt.optionValue, 'TEXT'); setPickerOpen(false); }}
+                                            style={[s.sheetItem, active && { backgroundColor: COLORS.primaryL }]}>
+                                            <Text style={[s.sheetItemTxt, active && { color: COLORS.primary, fontWeight: '700' }]}>{opt.optionLabel}</Text>
+                                            {active && <CheckCircle size={15} color={COLORS.primary} />}
+                                        </TouchableOpacity>
+                                    );
+                                }}
+                            />
+                        </View>
+                    </Pressable>
+                </Modal>
+            </>
+        );
+    }
+
+    if (q.answerType === 'IMAGE') {
+        const pickPhoto = async () => {
+            if (Platform.OS === 'android') {
+                const result = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.CAMERA);
+                if (result !== PermissionsAndroid.RESULTS.GRANTED) {
+                    Alert.alert('Izin Ditolak', 'Kamera tidak dapat diakses.');
+                    return;
+                }
+            }
+            launchCamera({ mediaType: 'photo', quality: 0.8, saveToPhotos: false }, (res) => {
+                if (res.didCancel || res.errorCode) return;
+                const uri = res.assets?.[0]?.uri;
+                if (uri) {
+                    const prev = Array.isArray(answers[q.id]) ? answers[q.id] : [];
+                    saveAnswer(q.id, [...prev, uri], 'IMAGE');
+                }
+            });
+        };
+
+        return (
+            <View style={{ gap: 12 }}>
+                {Array.isArray(answers[q.id]) && answers[q.id].length > 0 && (
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                        {answers[q.id].map((uri: string, i: number) => (
+                            <TouchableOpacity key={i} onPress={() => setLightbox({ uris: answers[q.id], index: i })} style={s.thumb}>
+                                <Image source={{ uri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                                <TouchableOpacity onPress={() => saveAnswer(q.id, answers[q.id].filter((_: any, j: number) => j !== i), 'IMAGE')} style={s.thumbDel}>
+                                    <X color="#fff" size={11} />
+                                </TouchableOpacity>
+                            </TouchableOpacity>
+                        ))}
+                    </View>
+                )}
+                <TouchableOpacity onPress={pickPhoto} style={s.photoBtn}>
+                    <Camera color={COLORS.primary} size={22} />
+                    <View>
+                        <Text style={s.photoBtnTitle}>{answers[q.id]?.length > 0 ? `Tambah Foto (${answers[q.id].length})` : 'Ambil Foto'}</Text>
+                        <Text style={s.photoBtnSub}>Bisa lebih dari 1 foto</Text>
+                    </View>
+                </TouchableOpacity>
+            </View>
+        );
+    }
+
+    return (
+        <TextInput
+            style={s.textInput}
+            placeholder={q.answerType === 'NUMBER' ? 'Masukkan angka...' : 'Ketik jawaban...'}
+            placeholderTextColor={COLORS.muted}
+            keyboardType={q.answerType === 'NUMBER' ? 'numeric' : 'default'}
+            multiline={q.answerType !== 'NUMBER'}
+            value={localTxt}
+            onChangeText={setLocalTxt}
+        />
+    );
+});
+
+const ImageLightbox = React.memo(({ lightbox, onClose }: any) => {
+    return (
+        <Modal visible animationType="fade" transparent>
+            <View style={{ flex: 1, backgroundColor: '#000' }}>
+                <View style={[s.lbHeader, { paddingTop: 40 }]}>
+                    <Text style={s.lbCount}>{lightbox.index + 1} / {lightbox.uris.length}</Text>
+                    <TouchableOpacity onPress={onClose}>
+                        <X color="#fff" size={22} />
+                    </TouchableOpacity>
+                </View>
+                <FlatList
+                    data={lightbox.uris}
+                    horizontal pagingEnabled
+                    showsHorizontalScrollIndicator={false}
+                    initialScrollIndex={lightbox.index}
+                    getItemLayout={(_, i) => ({ length: SW, offset: SW * i, index: i })}
+                    keyExtractor={(_, i) => String(i)}
+                    renderItem={({ item }) => (
+                        <View style={{ width: SW, justifyContent: 'center', alignItems: 'center' }}>
+                            <Image source={{ uri: item }} style={{ width: SW, height: SH * 0.75, resizeMode: 'contain' }} />
+                        </View>
+                    )}
+                />
+            </View>
+        </Modal>
+    );
+});
+
+// ════════════════════════════════════════════════════════════════════════════
 // STYLES
 // ════════════════════════════════════════════════════════════════════════════
 const s = StyleSheet.create({
-    // ── Shared ────────────────────────────────────────
-    centerScreen: {
-        flex: 1, backgroundColor: C.bg, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 40,
-    },
-    loadingIconWrap: {
-        width: 100, height: 100, borderRadius: 32, backgroundColor: C.primaryL,
-        alignItems: 'center', justifyContent: 'center', marginBottom: 28,
-    },
-    loadingIconInner: {
-        width: 56, height: 56, borderRadius: 20, backgroundColor: C.card,
-        alignItems: 'center', justifyContent: 'center',
-        elevation: 4, shadowColor: C.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 12,
-    },
-    loadingTitle: {
-        fontSize: 18, fontWeight: '800', color: C.dark, marginBottom: 8,
-    },
-    loadingSubtitle: {
-        fontSize: 13, color: C.sub, marginBottom: 32, textAlign: 'center',
-    },
-    errorTitle: {
-        fontSize: 20, fontWeight: '900', color: C.danger, marginBottom: 8,
-    },
-    errorMsg: {
-        fontSize: 13, color: C.sub, textAlign: 'center', marginBottom: 28, lineHeight: 20,
-    },
-    primaryBtn: {
-        flexDirection: 'row', alignItems: 'center', gap: 8,
-        backgroundColor: C.primary, paddingHorizontal: 28, paddingVertical: 14,
-        borderRadius: 16, marginBottom: 14,
-        elevation: 3, shadowColor: C.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8,
-    },
-    primaryBtnText: {
-        color: C.white, fontWeight: '800', fontSize: 14,
-    },
-    ghostBtn: {
-        flexDirection: 'row', alignItems: 'center', gap: 6,
-        paddingHorizontal: 20, paddingVertical: 12, borderRadius: 12,
-    },
-    ghostBtnText: {
-        color: C.sub, fontWeight: '700', fontSize: 13,
-    },
-
-    // ── Hero Header ──────────────────────────────────
-    heroWrap: {
-        backgroundColor: C.primary,
-        paddingBottom: 32,
-        borderBottomLeftRadius: 36,
-        borderBottomRightRadius: 36,
-    },
-    heroInner: {
-        paddingHorizontal: 24,
-    },
-    heroBackBtn: {
-        width: 32, height: 32, borderRadius: 10,
-        backgroundColor: 'rgba(255,255,255,0.2)',
-        alignItems: 'center', justifyContent: 'center',
-    },
-    heroLabel: {
-        color: 'rgba(255,255,255,0.55)', fontSize: 11, fontWeight: '900',
-        letterSpacing: 3, marginBottom: 6,
-    },
-    heroName: {
-        color: C.white, fontSize: 26, fontWeight: '900', marginBottom: 14,
-    },
-    heroMeta: {
-        flexDirection: 'row', alignItems: 'center', marginBottom: 22,
-    },
-    heroBadge: {
-        flexDirection: 'row', alignItems: 'center', gap: 4,
-        backgroundColor: 'rgba(255,255,255,0.18)',
-        paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10, marginRight: 12,
-    },
-    heroBadgeText: {
-        color: C.white, fontSize: 11, fontWeight: '900',
-    },
-    heroPurpose: {
-        color: 'rgba(255,255,255,0.55)', fontSize: 12, fontWeight: '700', fontStyle: 'italic',
-    },
-    heroProgress: {
-        backgroundColor: 'rgba(255,255,255,0.12)',
-        borderRadius: 18, padding: 16,
-    },
-    heroProgressHeader: {
-        flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10,
-    },
-    heroProgressLabel: {
-        color: 'rgba(255,255,255,0.7)', fontSize: 11, fontWeight: '700',
-    },
-    heroProgressPct: {
-        color: C.white, fontSize: 15, fontWeight: '900',
-    },
-    heroProgressTrack: {
-        height: 6, backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 99, overflow: 'hidden',
-    },
-    heroProgressFill: {
-        height: '100%', backgroundColor: C.white, borderRadius: 99,
-    },
-    heroProgressSub: {
-        color: 'rgba(255,255,255,0.5)', fontSize: 10, fontWeight: '600', marginTop: 8,
-    },
-
-    // ── Section List ─────────────────────────────────
-    sectionHeader: {
-        flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-        paddingHorizontal: 4, marginTop: 22, marginBottom: 18,
-    },
-    sectionTitle: {
-        fontSize: 20, fontWeight: '900', color: C.dark,
-    },
-    sectionSub: {
-        fontSize: 12, color: C.sub, fontWeight: '600', marginTop: 2,
-    },
-    sectionCount: {
-        flexDirection: 'row', alignItems: 'center', gap: 6,
-        backgroundColor: C.primaryL, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 12,
-    },
-    sectionCountText: {
-        color: C.primary, fontSize: 14, fontWeight: '900',
-    },
-    sectionCard: {
-        backgroundColor: C.card, padding: 20, borderRadius: 22,
-        marginBottom: 14, flexDirection: 'row', alignItems: 'center',
-        borderWidth: 1, borderColor: C.borderL,
-        elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 8,
-    },
-    secIcon: {
-        width: 52, height: 52, borderRadius: 16,
-        alignItems: 'center', justifyContent: 'center', marginRight: 16,
-    },
-    secTopRow: {
-        flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4,
-    },
-    secLabel: {
-        color: C.sub, fontSize: 10, fontWeight: '800', letterSpacing: 1,
-    },
-    secStatus: {
-        fontSize: 11, fontWeight: '800',
-    },
-    secName: {
-        color: C.text, fontWeight: '800', fontSize: 16, marginBottom: 10,
-    },
-    secProgressWrap: {
-        flexDirection: 'row', alignItems: 'center', gap: 8,
-    },
-    secProgressTrack: {
-        flex: 1, height: 4, backgroundColor: C.borderL, borderRadius: 99, overflow: 'hidden',
-    },
-    secProgressFill: {
-        height: '100%', borderRadius: 99,
-    },
-    secProgressText: {
-        fontSize: 10, fontWeight: '800', width: 30, textAlign: 'right',
-    },
-
-    // ── Submit ───────────────────────────────────────
-    submitWrap: {
-        position: 'absolute', bottom: 0, left: 0, right: 0,
-        paddingHorizontal: 20, paddingBottom: 28, paddingTop: 16,
-        backgroundColor: C.bg,
-    },
-    submitBtn: {
-        flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10,
-        backgroundColor: C.primary, height: 58, borderRadius: 20,
-        elevation: 6, shadowColor: C.primary, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.35, shadowRadius: 16,
-    },
-    submitBtnText: {
-        color: C.white, fontWeight: '900', fontSize: 14, letterSpacing: 1.5, textTransform: 'uppercase',
-    },
-    submitHint: {
-        textAlign: 'center', color: C.muted, fontSize: 11, fontWeight: '600', marginTop: 10,
-    },
-
-    // ── Question View ────────────────────────────────
-    qHeader: {
-        backgroundColor: C.card, paddingHorizontal: 24, paddingBottom: 24,
-        borderBottomLeftRadius: 28, borderBottomRightRadius: 28,
-        elevation: 3, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 10,
-    },
-    qHeaderTop: {
-        flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20,
-    },
-    qBackBtn: {
-        width: 44, height: 44, alignItems: 'center', justifyContent: 'center',
-        backgroundColor: C.bg, borderRadius: 14,
-    },
-    qSectionLabel: {
-        backgroundColor: C.primaryL, paddingHorizontal: 14, paddingVertical: 6, borderRadius: 10,
-    },
-    qSectionLabelText: {
-        color: C.primary, fontWeight: '800', fontSize: 12,
-    },
-    qSaveIndicator: {
-        width: 44, alignItems: 'flex-end',
-    },
-    qProgressRow: {
-        flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8,
-    },
-    qProgressLabel: {
-        color: C.sub, fontSize: 12, fontWeight: '700',
-    },
-    qProgressPct: {
-        color: C.primary, fontSize: 13, fontWeight: '900',
-    },
-    qProgressTrack: {
-        height: 5, backgroundColor: C.borderL, borderRadius: 99, overflow: 'hidden',
-    },
-    qProgressFill: {
-        height: '100%', backgroundColor: C.primary, borderRadius: 99,
-    },
-
-    qQuestionCard: {
-        backgroundColor: C.card, borderRadius: 24, padding: 28,
-        elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 8,
-        borderWidth: 1, borderColor: C.borderL,
-    },
-    qQuestionNumWrap: {
-        backgroundColor: C.primaryL, alignSelf: 'flex-start',
-        paddingHorizontal: 12, paddingVertical: 5, borderRadius: 10, marginBottom: 16,
-    },
-    qQuestionNum: {
-        color: C.primary, fontWeight: '900', fontSize: 12,
-    },
-    qQuestionText: {
-        color: C.dark, fontSize: 20, fontWeight: '800', lineHeight: 32,
-    },
-
-    boolBtn: {
-        flex: 1, height: 88, borderRadius: 20, alignItems: 'center', justifyContent: 'center',
-        borderWidth: 2, elevation: 1,
-    },
-    boolIcon: {
-        fontSize: 28, fontWeight: '900', marginBottom: 4,
-    },
-    boolLabel: {
-        fontWeight: '800', fontSize: 14, textTransform: 'uppercase', letterSpacing: 1,
-    },
-
-    optionBtn: {
-        flexDirection: 'row', alignItems: 'center', padding: 18,
-        borderRadius: 16, borderWidth: 2, borderColor: C.border,
-        backgroundColor: C.card,
-    },
-    optionBtnActive: {
-        borderColor: C.primary, backgroundColor: C.primaryL,
-    },
-    optionRadio: {
-        width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: C.border,
-        alignItems: 'center', justifyContent: 'center', marginRight: 14,
-    },
-    optionRadioActive: {
-        borderColor: C.primary,
-    },
-    optionRadioDot: {
-        width: 10, height: 10, borderRadius: 5, backgroundColor: C.primary,
-    },
-    optionLabel: {
-        fontWeight: '700', fontSize: 15, color: C.text,
-    },
-    optionLabelActive: {
-        color: C.primary, fontWeight: '800',
-    },
-
-    textInputWrap: {
-        backgroundColor: C.card, borderRadius: 20, borderWidth: 1, borderColor: C.border,
-        overflow: 'hidden',
-    },
-    textInput: {
-        padding: 24, fontSize: 16, minHeight: 160, color: C.text,
-        textAlignVertical: 'top',
-    },
-
-    qFooter: {
-        flexDirection: 'row', padding: 20, paddingBottom: 28,
-        backgroundColor: C.bg,
-    },
-    qPrevBtn: {
-        height: 54, width: 54, borderRadius: 18, backgroundColor: C.card,
-        borderWidth: 1, borderColor: C.border,
-        alignItems: 'center', justifyContent: 'center', marginRight: 12,
-    },
-    qNextBtn: {
-        flex: 1, backgroundColor: C.primary, height: 54, borderRadius: 18,
-        flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
-        elevation: 4, shadowColor: C.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 10,
-    },
-    qNextBtnText: {
-        color: C.white, fontWeight: '900', fontSize: 13, letterSpacing: 2, textTransform: 'uppercase',
-    },
-
-    // ── Picker ──────────────────────────────────────
-    pickerTrigger: {
-        flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-        backgroundColor: C.card, paddingHorizontal: 20, paddingVertical: 18,
-        borderRadius: 18, borderWidth: 1, borderColor: C.border,
-    },
-    pickerValue: {
-        fontSize: 16, fontWeight: '700', color: C.text,
-    },
-    modalOverlay: {
-        flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.4)', justifyContent: 'flex-end',
-    },
-    pickerModal: {
-        backgroundColor: C.card, borderTopLeftRadius: 32, borderTopRightRadius: 32,
-        maxHeight: Dimensions.get('window').height * 0.7, paddingBottom: 40,
-    },
-    pickerHeader: {
-        padding: 24, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: C.borderL,
-    },
-    pickerTitle: {
-        fontSize: 18, fontWeight: '900', color: C.dark,
-    },
-    pickerItem: {
-        flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-        padding: 24, borderBottomWidth: 1, borderBottomColor: C.borderL,
-    },
-    pickerItemActive: {
-        backgroundColor: C.primaryL,
-    },
-    pickerItemText: {
-        fontSize: 16, fontWeight: '700', color: C.text,
-    },
-    pickerItemTextActive: {
-        color: C.primary, fontWeight: '800',
-    },
-
-    // ── Image Button ────────────────────────────────
-    imageBtn: {
-        flexDirection: 'row', alignItems: 'center',
-        backgroundColor: C.card, padding: 16, borderRadius: 24,
-        borderWidth: 1, borderColor: C.border, gap: 16,
-    },
-    imageBtnIcon: {
-        width: 64, height: 64, borderRadius: 16,
-        backgroundColor: C.primaryL, alignItems: 'center', justifyContent: 'center',
-    },
-    imageBtnTitle: {
-        fontSize: 16, fontWeight: '800', color: C.dark, marginBottom: 2,
-    },
-    imageBtnSub: {
-        fontSize: 12, color: C.sub, fontWeight: '600',
-    },
-    imageBtnPlus: {
-        position: 'absolute', right: 12, top: 12,
-        width: 24, height: 24, borderRadius: 12,
-        backgroundColor: C.primary, alignItems: 'center', justifyContent: 'center',
-    },
+    center: { flex: 1, backgroundColor: COLORS.bg, justifyContent: 'center', alignItems: 'center', padding: 32 },
+    iconBox: { width: 72, height: 72, borderRadius: 24, alignItems: 'center', justifyContent: 'center', marginBottom: 20 },
+    loadTitle: { fontSize: 15, color: COLORS.sub, marginTop: 14, marginBottom: 24 },
+    errorTitle: { fontSize: 18, fontWeight: '700', color: COLORS.text, marginBottom: 8 },
+    errorMsg: { fontSize: 13, color: COLORS.sub, textAlign: 'center', lineHeight: 20, marginBottom: 24 },
+    btn: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: COLORS.primary, paddingHorizontal: 24, paddingVertical: 13, borderRadius: 12, marginBottom: 12 },
+    btnTxt: { color: COLORS.white, fontWeight: '700', fontSize: 14 },
+    linkBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, padding: 12 },
+    linkTxt: { color: COLORS.sub, fontWeight: '600', fontSize: 13 },
+    header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingBottom: 16 },
+    backBtn: { width: 40, height: 40, borderRadius: 12, backgroundColor: COLORS.card, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: COLORS.border },
+    headerSub: { fontSize: 11, color: COLORS.muted, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 1 },
+    headerTitle: { fontSize: 18, fontWeight: '800', color: COLORS.text, marginTop: 2 },
+    badge: { backgroundColor: COLORS.primaryL, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10 },
+    badgeTxt: { fontSize: 14, fontWeight: '800', color: COLORS.primary },
+    progCard: { marginHorizontal: 16, marginBottom: 20, backgroundColor: COLORS.card, borderRadius: 16, padding: 18, borderWidth: 1, borderColor: COLORS.border },
+    progCardLabel: { fontSize: 13, color: COLORS.sub, fontWeight: '600' },
+    progCardCount: { fontSize: 13, color: COLORS.text, fontWeight: '700' },
+    progTrackLg: { height: 6, backgroundColor: COLORS.border, borderRadius: 99, overflow: 'hidden' },
+    progFillLg: { height: '100%', borderRadius: 99 },
+    listTitle: { fontSize: 15, fontWeight: '800', color: COLORS.text, marginBottom: 12 },
+    secCard: { backgroundColor: COLORS.card, borderRadius: 16, padding: 16, marginBottom: 10, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: COLORS.border },
+    secIconBox: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginRight: 14 },
+    secIdx: { fontSize: 11, color: COLORS.muted, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 },
+    secStat: { fontSize: 12, fontWeight: '700' },
+    secName: { fontSize: 15, fontWeight: '700', color: COLORS.text, marginBottom: 8 },
+    secProg: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    secProgTrack: { flex: 1, height: 3, backgroundColor: COLORS.border, borderRadius: 99, overflow: 'hidden' },
+    secProgFill: { height: '100%', borderRadius: 99 },
+    secProgTxt: { fontSize: 11, color: COLORS.muted, fontWeight: '600', width: 28, textAlign: 'right' },
+    submitWrap: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 16, paddingBottom: 28, backgroundColor: COLORS.bg, borderTopWidth: 1, borderTopColor: COLORS.border },
+    submitBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: COLORS.primary, height: 52, borderRadius: 14 },
+    submitTxt: { color: COLORS.white, fontWeight: '800', fontSize: 15 },
+    submitHint: { textAlign: 'center', color: COLORS.muted, fontSize: 11, marginTop: 8 },
+    qHead: { backgroundColor: COLORS.card, paddingHorizontal: 16, paddingBottom: 18, borderBottomWidth: 1, borderBottomColor: COLORS.border },
+    qHeadRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
+    iconBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+    qSectionName: { flex: 1, fontSize: 15, fontWeight: '700', color: COLORS.text, textAlign: 'center' },
+    progRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+    progLabel: { fontSize: 12, color: COLORS.muted, fontWeight: '600', width: 36 },
+    progTrack: { flex: 1, height: 4, backgroundColor: COLORS.border, borderRadius: 99, overflow: 'hidden' },
+    progFill: { height: '100%', backgroundColor: COLORS.primary, borderRadius: 99 },
+    progPct: { fontSize: 12, fontWeight: '700', color: COLORS.primary, width: 34, textAlign: 'right' },
+    qCard: { backgroundColor: COLORS.card, borderRadius: 16, padding: 20, borderWidth: 1, borderColor: COLORS.border },
+    qNum: { fontSize: 11, color: COLORS.muted, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 },
+    qText: { fontSize: 18, fontWeight: '700', color: COLORS.text, lineHeight: 28 },
+    boolBtn: { flex: 1, height: 52, borderRadius: 12, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: COLORS.border, backgroundColor: COLORS.card },
+    boolTxt: { fontSize: 15, fontWeight: '700' },
+    selectTrigger: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: COLORS.card, paddingHorizontal: 16, paddingVertical: 14, borderRadius: 12, borderWidth: 1, borderColor: COLORS.border },
+    selectVal: { fontSize: 15, fontWeight: '600', color: COLORS.text },
+    overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.3)', justifyContent: 'flex-end' },
+    sheet: { backgroundColor: COLORS.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: Dimensions.get('window').height * 0.65, paddingBottom: 32 },
+    sheetTitle: { fontSize: 16, fontWeight: '800', color: COLORS.text, padding: 20, borderBottomWidth: 1, borderBottomColor: COLORS.border },
+    sheetItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: COLORS.border },
+    sheetItemTxt: { fontSize: 15, color: COLORS.text, fontWeight: '500' },
+    thumb: { width: 86, height: 86, borderRadius: 12, overflow: 'hidden', borderWidth: 1, borderColor: COLORS.border },
+    thumbDel: { position: 'absolute', top: 4, right: 4, backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 8, padding: 4 },
+    photoBtn: { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: COLORS.card, padding: 16, borderRadius: 14, borderWidth: 1, borderColor: COLORS.border },
+    photoBtnTitle: { fontSize: 14, fontWeight: '700', color: COLORS.text, marginBottom: 2 },
+    photoBtnSub: { fontSize: 12, color: COLORS.muted },
+    textInput: { backgroundColor: COLORS.card, borderRadius: 12, borderWidth: 1, borderColor: COLORS.border, padding: 16, fontSize: 15, color: COLORS.text, minHeight: 140, textAlignVertical: 'top' },
+    qFooter: { flexDirection: 'row', padding: 16, paddingBottom: 28, backgroundColor: COLORS.bg, gap: 10, borderTopWidth: 1, borderTopColor: COLORS.border },
+    prevBtn: { width: 52, height: 52, borderRadius: 14, backgroundColor: COLORS.card, borderWidth: 1, borderColor: COLORS.border, alignItems: 'center', justifyContent: 'center' },
+    nextBtn: { flex: 1, backgroundColor: COLORS.primary, height: 52, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
+    nextBtnTxt: { color: COLORS.white, fontWeight: '800', fontSize: 15 },
+    lbHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingBottom: 12 },
+    lbCount: { color: '#fff', fontSize: 14, fontWeight: '600' },
 });

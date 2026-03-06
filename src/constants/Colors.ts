@@ -1,56 +1,80 @@
 export const COLORS = {
-    // Brand Colors
-    primary: '#3b82f6', // Bright Modern Blue
-    secondary: '#94a3b8', // Light Slate
-    dark: '#334155', // Soft Slate-600 for text
-    light: '#ffffff', // Pure White
+    // Basic
+    white: '#FFFFFF',
+    black: '#000000',
+    transparent: 'transparent',
 
-    // Semantic Colors
-    success: '#10B981', // Emerald-500
-    danger: '#e11d48', // Rose-600
-    warning: '#D97706', // Amber-600
-    info: '#2563EB', // Blue-600
+    // Brand Colors
+    primary: '#1A56DB',   // Premium Blue
+    primaryL: '#EEF3FF',  // Light Blue BG
+    primaryD: '#1E429F',  // Darker Blue
+
+    // Grayscale / Text
+    text: '#0F1117',      // Primary Text (Old T.text)
+    dark: '#0F1117',
+    mid: '#374151',
+    sub: '#6B7280',       // Secondary Text (Old T.sub)
+    soft: '#6B7280',
+    muted: '#9CA3AF',     // Placeholder / Disabled
+    border: '#E5E7EB',    // Universal Border
+    borderL: '#F3F4F6',   // Light Border
 
     // Backgrounds
-    background: '#F8FAFC', // Slate-50
-    card: '#FFFFFF',
+    bg: '#F8FAFC',        // Main Screen BG
+    bgSoft: '#F3F4F6',
+    card: '#FFFFFF',      // Card Surface (Old T.card)
+    surface: '#FFFFFF',
 
-    // Status Colors (from Dashboard)
+    // Status Semantic Colors
+    success: '#059669',
+    successL: '#ECFDF5',
+    danger: '#E11D48',
+    dangerL: '#FFF1F2',
+    warning: '#D97706',
+    warningL: '#FFFBEB',
+    info: '#2563EB',
+    infoL: '#EFF6FF',
+    purple: '#7C3AED',
+    purpleL: '#F5F3FF',
+    teal: '#0D9488',
+    tealL: '#F0FDFA',
+
+    // Logic-based Status Mapping
     status: {
         inProgress: {
             text: '#2563EB',
-            bg: '#eff6ff', // blue-50
-            dot: '#2563eb' // blue-600
+            bg: '#EFF6FF',
+            dot: '#2563EB'
         },
         assigned: {
             text: '#D97706',
-            bg: '#fffbeb', // amber-50
-            dot: '#d97706' // amber-600
+            bg: '#FFFBEB',
+            dot: '#D97706'
         },
         start: {
             text: '#7C3AED',
-            bg: '#f5f3ff', // purple-50
-            dot: '#7c3aed' // purple-600
+            bg: '#F5F3FF',
+            dot: '#7C3AED'
         },
         submitted: {
             text: '#059669',
-            bg: '#ecfdf5', // emerald-50
-            dot: '#059669' // emerald-600
+            bg: '#ECFDF5',
+            dot: '#059669'
         },
         verified: {
-            text: '#10B981',
-            bg: '#f0fdf4', // teal-50
-            dot: '#10b981' // teal-600
+            text: '#0D9488',
+            bg: '#F0FDFA',
+            dot: '#0D9488'
         },
         pending: {
             text: '#6B7280',
-            bg: '#f8fafc', // slate-50
-            dot: '#94a3b8' // slate-400
+            bg: '#F9FAFB',
+            dot: '#9CA3AF'
         },
         rejected: {
-            text: '#e11d48',
-            bg: '#fff1f2', // rose-50
-            dot: '#e11d48' // rose-600
+            text: '#E11D48',
+            bg: '#FFF1F2',
+            dot: '#E11D48'
         }
     }
 };

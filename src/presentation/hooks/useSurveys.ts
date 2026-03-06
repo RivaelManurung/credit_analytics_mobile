@@ -1,8 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { SurveyRepositoryImpl } from '../../data/repositories/SurveyRepositoryImpl';
+import { surveyRepo } from '../../data/repositories';
 import { ApplicationSurvey, SurveyTemplate, SurveySection } from '../../gen/survey/v1/survey_pb';
 
-const surveyRepo = new SurveyRepositoryImpl();
 
 // --- Query Keys ---
 export const surveyKeys = {

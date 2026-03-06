@@ -7,33 +7,132 @@ import type { BinaryReadOptions, FieldList, JsonReadOptions, JsonValue, PartialM
 import { Message, proto3, Timestamp } from "@bufbuild/protobuf";
 
 /**
+ * @generated from message api.applicant.v1.SelectedOption
+ */
+export class SelectedOption extends Message<SelectedOption> {
+  /**
+   * @generated from field: string code = 1;
+   */
+  code = "";
+
+  /**
+   * hidden storage ID
+   *
+   * @generated from field: string label = 2;
+   */
+  label = "";
+
+  constructor(data?: PartialMessage<SelectedOption>) {
+    super();
+    proto3.util.initPartial(data, this);
+  }
+
+  static readonly runtime: typeof proto3 = proto3;
+  static readonly typeName = "api.applicant.v1.SelectedOption";
+  static readonly fields: FieldList = proto3.util.newFieldList(() => [
+    { no: 1, name: "code", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+    { no: 2, name: "label", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+  ]);
+
+  static fromBinary(bytes: Uint8Array, options?: Partial<BinaryReadOptions>): SelectedOption {
+    return new SelectedOption().fromBinary(bytes, options);
+  }
+
+  static fromJson(jsonValue: JsonValue, options?: Partial<JsonReadOptions>): SelectedOption {
+    return new SelectedOption().fromJson(jsonValue, options);
+  }
+
+  static fromJsonString(jsonString: string, options?: Partial<JsonReadOptions>): SelectedOption {
+    return new SelectedOption().fromJsonString(jsonString, options);
+  }
+
+  static equals(a: SelectedOption | PlainMessage<SelectedOption> | undefined, b: SelectedOption | PlainMessage<SelectedOption> | undefined): boolean {
+    return proto3.util.equals(SelectedOption, a, b);
+  }
+}
+
+/**
+ * @generated from message api.applicant.v1.ValueLayer
+ */
+export class ValueLayer extends Message<ValueLayer> {
+  /**
+   * @generated from field: string raw_value = 1;
+   */
+  rawValue = "";
+
+  /**
+   * @generated from field: api.applicant.v1.SelectedOption selected_option = 2;
+   */
+  selectedOption?: SelectedOption;
+
+  constructor(data?: PartialMessage<ValueLayer>) {
+    super();
+    proto3.util.initPartial(data, this);
+  }
+
+  static readonly runtime: typeof proto3 = proto3;
+  static readonly typeName = "api.applicant.v1.ValueLayer";
+  static readonly fields: FieldList = proto3.util.newFieldList(() => [
+    { no: 1, name: "raw_value", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+    { no: 2, name: "selected_option", kind: "message", T: SelectedOption },
+  ]);
+
+  static fromBinary(bytes: Uint8Array, options?: Partial<BinaryReadOptions>): ValueLayer {
+    return new ValueLayer().fromBinary(bytes, options);
+  }
+
+  static fromJson(jsonValue: JsonValue, options?: Partial<JsonReadOptions>): ValueLayer {
+    return new ValueLayer().fromJson(jsonValue, options);
+  }
+
+  static fromJsonString(jsonString: string, options?: Partial<JsonReadOptions>): ValueLayer {
+    return new ValueLayer().fromJsonString(jsonString, options);
+  }
+
+  static equals(a: ValueLayer | PlainMessage<ValueLayer> | undefined, b: ValueLayer | PlainMessage<ValueLayer> | undefined): boolean {
+    return proto3.util.equals(ValueLayer, a, b);
+  }
+}
+
+/**
  * @generated from message api.applicant.v1.ApplicantAttribute
  */
 export class ApplicantAttribute extends Message<ApplicantAttribute> {
   /**
-   * @generated from field: string attribute_id = 1;
+   * Metadata & Indexing
+   *
+   * @generated from field: string code = 1;
    */
-  attributeId = "";
+  code = "";
 
   /**
-   * @generated from field: string value = 2;
+   * @generated from field: string label = 2;
    */
-  value = "";
+  label = "";
 
   /**
-   * @generated from field: string data_type = 3;
+   * @generated from field: string type = 3;
    */
-  dataType = "";
+  type = "";
 
   /**
-   * @generated from field: google.protobuf.Timestamp updated_at = 4;
+   * Value Layer
+   *
+   * @generated from field: api.applicant.v1.ValueLayer value = 4;
+   */
+  value?: ValueLayer;
+
+  /**
+   * Storage & Audit
+   *
+   * @generated from field: string id = 5;
+   */
+  id = "";
+
+  /**
+   * @generated from field: google.protobuf.Timestamp updated_at = 6;
    */
   updatedAt?: Timestamp;
-
-  /**
-   * @generated from field: string attribute_option_id = 5;
-   */
-  attributeOptionId = "";
 
   constructor(data?: PartialMessage<ApplicantAttribute>) {
     super();
@@ -43,11 +142,12 @@ export class ApplicantAttribute extends Message<ApplicantAttribute> {
   static readonly runtime: typeof proto3 = proto3;
   static readonly typeName = "api.applicant.v1.ApplicantAttribute";
   static readonly fields: FieldList = proto3.util.newFieldList(() => [
-    { no: 1, name: "attribute_id", kind: "scalar", T: 9 /* ScalarType.STRING */ },
-    { no: 2, name: "value", kind: "scalar", T: 9 /* ScalarType.STRING */ },
-    { no: 3, name: "data_type", kind: "scalar", T: 9 /* ScalarType.STRING */ },
-    { no: 4, name: "updated_at", kind: "message", T: Timestamp },
-    { no: 5, name: "attribute_option_id", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+    { no: 1, name: "code", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+    { no: 2, name: "label", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+    { no: 3, name: "type", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+    { no: 4, name: "value", kind: "message", T: ValueLayer },
+    { no: 5, name: "id", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+    { no: 6, name: "updated_at", kind: "message", T: Timestamp },
   ]);
 
   static fromBinary(bytes: Uint8Array, options?: Partial<BinaryReadOptions>): ApplicantAttribute {
@@ -68,6 +168,92 @@ export class ApplicantAttribute extends Message<ApplicantAttribute> {
 }
 
 /**
+ * @generated from message api.applicant.v1.IndividualDetails
+ */
+export class IndividualDetails extends Message<IndividualDetails> {
+  /**
+   * @generated from field: string identity_number = 1;
+   */
+  identityNumber = "";
+
+  /**
+   * @generated from field: string birth_date = 2;
+   */
+  birthDate = "";
+
+  constructor(data?: PartialMessage<IndividualDetails>) {
+    super();
+    proto3.util.initPartial(data, this);
+  }
+
+  static readonly runtime: typeof proto3 = proto3;
+  static readonly typeName = "api.applicant.v1.IndividualDetails";
+  static readonly fields: FieldList = proto3.util.newFieldList(() => [
+    { no: 1, name: "identity_number", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+    { no: 2, name: "birth_date", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+  ]);
+
+  static fromBinary(bytes: Uint8Array, options?: Partial<BinaryReadOptions>): IndividualDetails {
+    return new IndividualDetails().fromBinary(bytes, options);
+  }
+
+  static fromJson(jsonValue: JsonValue, options?: Partial<JsonReadOptions>): IndividualDetails {
+    return new IndividualDetails().fromJson(jsonValue, options);
+  }
+
+  static fromJsonString(jsonString: string, options?: Partial<JsonReadOptions>): IndividualDetails {
+    return new IndividualDetails().fromJsonString(jsonString, options);
+  }
+
+  static equals(a: IndividualDetails | PlainMessage<IndividualDetails> | undefined, b: IndividualDetails | PlainMessage<IndividualDetails> | undefined): boolean {
+    return proto3.util.equals(IndividualDetails, a, b);
+  }
+}
+
+/**
+ * @generated from message api.applicant.v1.CompanyDetails
+ */
+export class CompanyDetails extends Message<CompanyDetails> {
+  /**
+   * @generated from field: string registration_number = 1;
+   */
+  registrationNumber = "";
+
+  /**
+   * @generated from field: string establishment_date = 2;
+   */
+  establishmentDate = "";
+
+  constructor(data?: PartialMessage<CompanyDetails>) {
+    super();
+    proto3.util.initPartial(data, this);
+  }
+
+  static readonly runtime: typeof proto3 = proto3;
+  static readonly typeName = "api.applicant.v1.CompanyDetails";
+  static readonly fields: FieldList = proto3.util.newFieldList(() => [
+    { no: 1, name: "registration_number", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+    { no: 2, name: "establishment_date", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+  ]);
+
+  static fromBinary(bytes: Uint8Array, options?: Partial<BinaryReadOptions>): CompanyDetails {
+    return new CompanyDetails().fromBinary(bytes, options);
+  }
+
+  static fromJson(jsonValue: JsonValue, options?: Partial<JsonReadOptions>): CompanyDetails {
+    return new CompanyDetails().fromJson(jsonValue, options);
+  }
+
+  static fromJsonString(jsonString: string, options?: Partial<JsonReadOptions>): CompanyDetails {
+    return new CompanyDetails().fromJsonString(jsonString, options);
+  }
+
+  static equals(a: CompanyDetails | PlainMessage<CompanyDetails> | undefined, b: CompanyDetails | PlainMessage<CompanyDetails> | undefined): boolean {
+    return proto3.util.equals(CompanyDetails, a, b);
+  }
+}
+
+/**
  * @generated from message api.applicant.v1.Applicant
  */
 export class Applicant extends Message<Applicant> {
@@ -77,14 +263,14 @@ export class Applicant extends Message<Applicant> {
   id = "";
 
   /**
-   * @generated from field: string applicant_type = 2;
+   * @generated from field: string type = 2;
    */
-  applicantType = "";
+  type = "";
 
   /**
-   * @generated from field: string identity_number = 3;
+   * @generated from field: string full_name = 3;
    */
-  identityNumber = "";
+  fullName = "";
 
   /**
    * @generated from field: string tax_id = 4;
@@ -92,27 +278,29 @@ export class Applicant extends Message<Applicant> {
   taxId = "";
 
   /**
-   * @generated from field: string full_name = 5;
+   * @generated from oneof api.applicant.v1.Applicant.details
    */
-  fullName = "";
+  details: {
+    /**
+     * @generated from field: api.applicant.v1.IndividualDetails individual = 5;
+     */
+    value: IndividualDetails;
+    case: "individual";
+  } | {
+    /**
+     * @generated from field: api.applicant.v1.CompanyDetails company = 6;
+     */
+    value: CompanyDetails;
+    case: "company";
+  } | { case: undefined; value?: undefined } = { case: undefined };
 
   /**
-   * @generated from field: string birth_date = 6;
-   */
-  birthDate = "";
-
-  /**
-   * @generated from field: string establishment_date = 7;
-   */
-  establishmentDate = "";
-
-  /**
-   * @generated from field: repeated api.applicant.v1.ApplicantAttribute attributes = 8;
+   * @generated from field: repeated api.applicant.v1.ApplicantAttribute attributes = 7;
    */
   attributes: ApplicantAttribute[] = [];
 
   /**
-   * @generated from field: google.protobuf.Timestamp created_at = 9;
+   * @generated from field: google.protobuf.Timestamp created_at = 8;
    */
   createdAt?: Timestamp;
 
@@ -125,14 +313,13 @@ export class Applicant extends Message<Applicant> {
   static readonly typeName = "api.applicant.v1.Applicant";
   static readonly fields: FieldList = proto3.util.newFieldList(() => [
     { no: 1, name: "id", kind: "scalar", T: 9 /* ScalarType.STRING */ },
-    { no: 2, name: "applicant_type", kind: "scalar", T: 9 /* ScalarType.STRING */ },
-    { no: 3, name: "identity_number", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+    { no: 2, name: "type", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+    { no: 3, name: "full_name", kind: "scalar", T: 9 /* ScalarType.STRING */ },
     { no: 4, name: "tax_id", kind: "scalar", T: 9 /* ScalarType.STRING */ },
-    { no: 5, name: "full_name", kind: "scalar", T: 9 /* ScalarType.STRING */ },
-    { no: 6, name: "birth_date", kind: "scalar", T: 9 /* ScalarType.STRING */ },
-    { no: 7, name: "establishment_date", kind: "scalar", T: 9 /* ScalarType.STRING */ },
-    { no: 8, name: "attributes", kind: "message", T: ApplicantAttribute, repeated: true },
-    { no: 9, name: "created_at", kind: "message", T: Timestamp },
+    { no: 5, name: "individual", kind: "message", T: IndividualDetails, oneof: "details" },
+    { no: 6, name: "company", kind: "message", T: CompanyDetails, oneof: "details" },
+    { no: 7, name: "attributes", kind: "message", T: ApplicantAttribute, repeated: true },
+    { no: 8, name: "created_at", kind: "message", T: Timestamp },
   ]);
 
   static fromBinary(bytes: Uint8Array, options?: Partial<BinaryReadOptions>): Applicant {
@@ -199,9 +386,9 @@ export class CreateApplicantRequest extends Message<CreateApplicantRequest> {
   applicantType = "";
 
   /**
-   * @generated from field: string identity_number = 2;
+   * @generated from field: string full_name = 2;
    */
-  identityNumber = "";
+  fullName = "";
 
   /**
    * @generated from field: string tax_id = 3;
@@ -209,22 +396,24 @@ export class CreateApplicantRequest extends Message<CreateApplicantRequest> {
   taxId = "";
 
   /**
-   * @generated from field: string full_name = 4;
+   * @generated from oneof api.applicant.v1.CreateApplicantRequest.details
    */
-  fullName = "";
+  details: {
+    /**
+     * @generated from field: api.applicant.v1.IndividualDetails individual = 4;
+     */
+    value: IndividualDetails;
+    case: "individual";
+  } | {
+    /**
+     * @generated from field: api.applicant.v1.CompanyDetails company = 5;
+     */
+    value: CompanyDetails;
+    case: "company";
+  } | { case: undefined; value?: undefined } = { case: undefined };
 
   /**
-   * @generated from field: string birth_date = 5;
-   */
-  birthDate = "";
-
-  /**
-   * @generated from field: string establishment_date = 6;
-   */
-  establishmentDate = "";
-
-  /**
-   * @generated from field: repeated api.applicant.v1.ApplicantAttribute attributes = 7;
+   * @generated from field: repeated api.applicant.v1.ApplicantAttribute attributes = 6;
    */
   attributes: ApplicantAttribute[] = [];
 
@@ -237,12 +426,11 @@ export class CreateApplicantRequest extends Message<CreateApplicantRequest> {
   static readonly typeName = "api.applicant.v1.CreateApplicantRequest";
   static readonly fields: FieldList = proto3.util.newFieldList(() => [
     { no: 1, name: "applicant_type", kind: "scalar", T: 9 /* ScalarType.STRING */ },
-    { no: 2, name: "identity_number", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+    { no: 2, name: "full_name", kind: "scalar", T: 9 /* ScalarType.STRING */ },
     { no: 3, name: "tax_id", kind: "scalar", T: 9 /* ScalarType.STRING */ },
-    { no: 4, name: "full_name", kind: "scalar", T: 9 /* ScalarType.STRING */ },
-    { no: 5, name: "birth_date", kind: "scalar", T: 9 /* ScalarType.STRING */ },
-    { no: 6, name: "establishment_date", kind: "scalar", T: 9 /* ScalarType.STRING */ },
-    { no: 7, name: "attributes", kind: "message", T: ApplicantAttribute, repeated: true },
+    { no: 4, name: "individual", kind: "message", T: IndividualDetails, oneof: "details" },
+    { no: 5, name: "company", kind: "message", T: CompanyDetails, oneof: "details" },
+    { no: 6, name: "attributes", kind: "message", T: ApplicantAttribute, repeated: true },
   ]);
 
   static fromBinary(bytes: Uint8Array, options?: Partial<BinaryReadOptions>): CreateApplicantRequest {
@@ -351,9 +539,9 @@ export class UpdateApplicantRequest extends Message<UpdateApplicantRequest> {
   applicantType = "";
 
   /**
-   * @generated from field: string identity_number = 3;
+   * @generated from field: string full_name = 3;
    */
-  identityNumber = "";
+  fullName = "";
 
   /**
    * @generated from field: string tax_id = 4;
@@ -361,22 +549,24 @@ export class UpdateApplicantRequest extends Message<UpdateApplicantRequest> {
   taxId = "";
 
   /**
-   * @generated from field: string full_name = 5;
+   * @generated from oneof api.applicant.v1.UpdateApplicantRequest.details
    */
-  fullName = "";
+  details: {
+    /**
+     * @generated from field: api.applicant.v1.IndividualDetails individual = 5;
+     */
+    value: IndividualDetails;
+    case: "individual";
+  } | {
+    /**
+     * @generated from field: api.applicant.v1.CompanyDetails company = 6;
+     */
+    value: CompanyDetails;
+    case: "company";
+  } | { case: undefined; value?: undefined } = { case: undefined };
 
   /**
-   * @generated from field: string birth_date = 6;
-   */
-  birthDate = "";
-
-  /**
-   * @generated from field: string establishment_date = 7;
-   */
-  establishmentDate = "";
-
-  /**
-   * @generated from field: repeated api.applicant.v1.ApplicantAttribute attributes = 8;
+   * @generated from field: repeated api.applicant.v1.ApplicantAttribute attributes = 7;
    */
   attributes: ApplicantAttribute[] = [];
 
@@ -390,12 +580,11 @@ export class UpdateApplicantRequest extends Message<UpdateApplicantRequest> {
   static readonly fields: FieldList = proto3.util.newFieldList(() => [
     { no: 1, name: "id", kind: "scalar", T: 9 /* ScalarType.STRING */ },
     { no: 2, name: "applicant_type", kind: "scalar", T: 9 /* ScalarType.STRING */ },
-    { no: 3, name: "identity_number", kind: "scalar", T: 9 /* ScalarType.STRING */ },
+    { no: 3, name: "full_name", kind: "scalar", T: 9 /* ScalarType.STRING */ },
     { no: 4, name: "tax_id", kind: "scalar", T: 9 /* ScalarType.STRING */ },
-    { no: 5, name: "full_name", kind: "scalar", T: 9 /* ScalarType.STRING */ },
-    { no: 6, name: "birth_date", kind: "scalar", T: 9 /* ScalarType.STRING */ },
-    { no: 7, name: "establishment_date", kind: "scalar", T: 9 /* ScalarType.STRING */ },
-    { no: 8, name: "attributes", kind: "message", T: ApplicantAttribute, repeated: true },
+    { no: 5, name: "individual", kind: "message", T: IndividualDetails, oneof: "details" },
+    { no: 6, name: "company", kind: "message", T: CompanyDetails, oneof: "details" },
+    { no: 7, name: "attributes", kind: "message", T: ApplicantAttribute, repeated: true },
   ]);
 
   static fromBinary(bytes: Uint8Array, options?: Partial<BinaryReadOptions>): UpdateApplicantRequest {

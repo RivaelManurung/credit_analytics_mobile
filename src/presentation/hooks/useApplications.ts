@@ -1,9 +1,8 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ApplicationRepositoryImpl } from '../../data/repositories/ApplicationRepositoryImpl';
+import { useQuery, useMutation, useQueryClient, useInfiniteQuery, InfiniteData } from '@tanstack/react-query';
+import { applicationRepo } from '../../data/repositories';
 import { Application } from '../../gen/application/v1/application_pb';
 
-const repo = new ApplicationRepositoryImpl();
-
+// ── Query Keys ───────────────────────────────────────────────────────────────
 export const applicationKeys = {
     all: ['applications'] as const,
     lists: () => [...applicationKeys.all, 'list'] as const,
@@ -11,25 +10,53 @@ export const applicationKeys = {
     detail: (id: string) => [...applicationKeys.details(), id] as const,
 };
 
+// ── Hooks ────────────────────────────────────────────────────────────────────
+
+/**
+ * Fetches a paginated list of applications with infinite scroll support.
+ */
 export function useApplications() {
-    return useQuery({
+    return useInfiniteQuery<
+        { applications: Application[]; nextCursor: string },
+        Error,
+        InfiniteData<{ applications: Application[]; nextCursor: string }, string | undefined>,
+        readonly ["applications", "list"],
+        string | undefined
+    >({
         queryKey: applicationKeys.lists(),
-        queryFn: () => repo.listApplications(),
-        // Stale time set to 5 mins as apps don't change that often
+        queryFn: ({ pageParam }) => applicationRepo.listApplications(pageParam as string | undefined),
+        initialPageParam: undefined,
+        getNextPageParam: (lastPage) => lastPage.nextCursor || undefined,
         staleTime: 1000 * 60 * 5,
     });
 }
 
+/**
+ * Fetches a single application by ID.
+ * Uses the dedicated GetApplication endpoint (not list + filter).
+ */
+export function useApplicationDetail(id: string) {
+    return useQuery({
+        queryKey: applicationKeys.detail(id),
+        queryFn: () => applicationRepo.getApplication(id),
+        enabled: !!id,
+        staleTime: 1000 * 60 * 5,
+    });
+}
+
+/**
+ * Mutation to change an application's status.
+ * Automatically invalidates the application cache on success.
+ */
 export function useUpdateApplicationStatus() {
     const queryClient = useQueryClient();
 
     const mutation = useMutation({
         mutationFn: (params: { id: string; newStatus: string; reason: string }) =>
-            repo.changeApplicationStatus(params.id, params.newStatus, params.reason),
+            applicationRepo.changeApplicationStatus(params.id, params.newStatus, params.reason),
         onSuccess: () => {
-            // Invalidate applications list to show updated status
             queryClient.invalidateQueries({ queryKey: applicationKeys.all });
-        }
+        },
     });
 
     return {

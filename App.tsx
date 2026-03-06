@@ -4,7 +4,9 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { DashboardScreen } from './src/presentation/screens/DashboardScreen';
 import { SurveyFormScreen } from './src/presentation/screens/SurveyFormScreen';
 import { ApplicationListScreen } from './src/presentation/screens/ApplicationListScreen';
+import { ApplicationDetailScreen } from './src/presentation/screens/ApplicationDetailScreen';
 import { LoginScreen } from './src/presentation/screens/LoginScreen';
+
 import { AuthProvider, useAuth } from './src/presentation/context/AuthContext';
 import { NavigationProvider, useAppNavigator } from './src/presentation/context/NavigationContext';
 
@@ -67,14 +69,20 @@ function AppContent() {
         <ApplicationListScreen />
       )}
 
+      {currentScreen === 'ApplicationDetail' && (
+        <ApplicationDetailScreen />
+      )}
+
       {currentScreen === 'SurveyForm' && params?.surveyId && params?.applicationId && (
         <SurveyFormScreen
           surveyId={params.surveyId}
           applicationId={params.applicationId}
-          onBack={handleNavigateDashboard}
+          onBack={goBack}
         />
       )}
+
     </View>
+
   );
 }
 

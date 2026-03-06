@@ -3,6 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ShieldCheck } from 'lucide-react-native';
 import { useAuth } from '../context/AuthContext';
+import { COLORS } from '../../constants';
 
 export function LoginScreen() {
     const { login } = useAuth();
@@ -22,8 +23,9 @@ export function LoginScreen() {
             >
                 <View className="items-center mb-12">
                     <View className="bg-blue-50 p-6 rounded-[32px] mb-8 border border-blue-100">
-                        <ShieldCheck color="#3b82f6" size={56} strokeWidth={2.5} />
+                        <ShieldCheck color={COLORS.primary} size={56} strokeWidth={2.5} />
                     </View>
+
                     <Text className="text-4xl font-black text-dark text-center tracking-tight">Survey <Text className="text-primary italic">Portal</Text></Text>
                     <Text className="text-secondary text-sm text-center mt-3 font-medium px-4 leading-5">Silakan masuk dengan ID Surveyor Anda untuk mulai bekerja pada sistem internal.</Text>
                 </View>
@@ -45,7 +47,7 @@ export function LoginScreen() {
                         onPress={handleLogin}
                         activeOpacity={0.8}
                         style={{
-                            shadowColor: '#3b82f6',
+                            shadowColor: COLORS.primary,
                             shadowOffset: { width: 0, height: 4 },
                             shadowOpacity: 0.2,
                             shadowRadius: 10,

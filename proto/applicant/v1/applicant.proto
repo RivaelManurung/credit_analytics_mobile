@@ -47,24 +47,54 @@ service ApplicantService {
   }
 }
 
+message SelectedOption {
+  string code = 1;
+  string label = 2;
+  // hidden storage ID
+}
+
+message ValueLayer {
+  string raw_value = 1;
+  SelectedOption selected_option = 2;
+}
+
 message ApplicantAttribute {
-  string attribute_id = 1;
-  string value = 2;
-  string data_type = 3;
-  google.protobuf.Timestamp updated_at = 4;
-  string attribute_option_id = 5;
+  // Metadata & Indexing
+  string code = 1;
+  string label = 2;
+  string type = 3;
+
+  // Value Layer
+  ValueLayer value = 4;
+  
+  // Storage & Audit
+  string id = 5; 
+  google.protobuf.Timestamp updated_at = 6;
+}
+
+message IndividualDetails {
+  string identity_number = 1;
+  string birth_date = 2;
+}
+
+message CompanyDetails {
+  string registration_number = 1;
+  string establishment_date = 2;
 }
 
 message Applicant {
   string id = 1;
-  string applicant_type = 2;
-  string identity_number = 3;
+  string type = 2;
+  string full_name = 3;
   string tax_id = 4;
-  string full_name = 5;
-  string birth_date = 6;
-  string establishment_date = 7;
-  repeated ApplicantAttribute attributes = 8;
-  google.protobuf.Timestamp created_at = 9;
+
+  oneof details {
+    IndividualDetails individual = 5;
+    CompanyDetails company = 6;
+  }
+
+  repeated ApplicantAttribute attributes = 7;
+  google.protobuf.Timestamp created_at = 8;
 }
 
 message ApplicantAttributes {
@@ -73,12 +103,15 @@ message ApplicantAttributes {
 
 message CreateApplicantRequest {
   string applicant_type = 1;
-  string identity_number = 2;
+  string full_name = 2;
   string tax_id = 3;
-  string full_name = 4;
-  string birth_date = 5;
-  string establishment_date = 6;
-  repeated ApplicantAttribute attributes = 7;
+  
+  oneof details {
+    IndividualDetails individual = 4;
+    CompanyDetails company = 5;
+  }
+  
+  repeated ApplicantAttribute attributes = 6;
 }
 
 message GetApplicantRequest {
@@ -92,12 +125,15 @@ message GetApplicantAttributesRequest {
 message UpdateApplicantRequest {
   string id = 1;
   string applicant_type = 2;
-  string identity_number = 3;
+  string full_name = 3;
   string tax_id = 4;
-  string full_name = 5;
-  string birth_date = 6;
-  string establishment_date = 7;
-  repeated ApplicantAttribute attributes = 8;
+  
+  oneof details {
+    IndividualDetails individual = 5;
+    CompanyDetails company = 6;
+  }
+  
+  repeated ApplicantAttribute attributes = 7;
 }
 
 message ListApplicantsRequest {

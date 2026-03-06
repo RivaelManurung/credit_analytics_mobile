@@ -199,3 +199,4 @@ message ListApplicationPartiesRequest {
 message ListApplicationPartiesResponse {
   repeated ApplicationParty parties = 1;
 }
+

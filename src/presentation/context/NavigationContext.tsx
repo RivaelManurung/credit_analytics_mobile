@@ -1,6 +1,10 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { BackHandler } from 'react-native';
+import React, { createContext, useContext, useState } from 'react';
 import { ScreenName } from '../types/navigation';
+
+interface HistoryEntry {
+    screen: ScreenName;
+    params: any;
+}
 
 interface NavigationContextType {
     currentScreen: ScreenName;
@@ -12,34 +16,28 @@ interface NavigationContextType {
 const NavigationContext = createContext<NavigationContextType | undefined>(undefined);
 
 export function NavigationProvider({ children }: { children: React.ReactNode }) {
-    const [currentScreen, setCurrentScreen] = useState<ScreenName>('Dashboard');
-    const [params, setParams] = useState<any>(null);
-    const [history, setHistory] = useState<ScreenName[]>(['Dashboard']);
+    const [history, setHistory] = useState<HistoryEntry[]>([{ screen: 'Dashboard', params: null }]);
+
+    const current = history[history.length - 1];
 
     const navigate = React.useCallback((screen: ScreenName, screenParams?: any) => {
-        setParams(screenParams);
-        setCurrentScreen(screen);
-        setHistory(prev => [...prev, screen]);
+        setHistory(prev => [...prev, { screen, params: screenParams ?? null }]);
     }, []);
 
     const goBack = React.useCallback(() => {
         if (history.length > 1) {
-            const newHistory = [...history];
-            newHistory.pop(); // remove current
-            const prevScreen = newHistory[newHistory.length - 1];
-            setHistory(newHistory);
-            setCurrentScreen(prevScreen);
+            setHistory(prev => prev.slice(0, -1));
             return true;
         }
         return false; // Exit app
-    }, [history]);
+    }, [history.length]);
 
     const value = React.useMemo(() => ({
-        currentScreen,
-        params,
+        currentScreen: current.screen,
+        params: current.params,
         navigate,
         goBack
-    }), [currentScreen, params, navigate, goBack]);
+    }), [current, navigate, goBack]);
 
     return (
         <NavigationContext.Provider value={value}>

@@ -1,261 +1,471 @@
-import React, { useMemo, useCallback } from 'react';
-import { View, Text, ScrollView, RefreshControl, ActivityIndicator, TouchableOpacity } from 'react-native';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
+import {
+    View,
+    Text,
+    FlatList,
+    RefreshControl,
+    ActivityIndicator,
+    TouchableOpacity,
+    TextInput,
+    Animated,
+} from 'react-native';
+
 import { SidebarLayout } from '../components/Layout/SidebarLayout';
-import { User, ClipboardList, CheckCircle, Info, ChevronRight, Search } from 'lucide-react-native';
+import { ChevronRight, Search, X, User } from 'lucide-react-native';
+
 import { useApplications } from '../hooks/useApplications';
-import { useMySurveys, useSurveyControl } from '../hooks/useSurveys';
+import { useMySurveys } from '../hooks/useSurveys';
 import { useAuth } from '../context/AuthContext';
 import { useAppNavigator } from '../context/NavigationContext';
+
 import { ApplicationMapper } from '../utils/ApplicationMapper';
-import { COLORS, LAYOUT } from '../../constants';
+import { applicantRepo } from '../../data/repositories';
 
-const STATUS_CONFIG: Record<string, any> = {
-    // --- Survey Statuses ---
-    IN_PROGRESS: { label: 'Sedang Berjalan', color: COLORS.status.inProgress.text, bg: 'bg-blue-50', dot: 'bg-blue-600' },
-    ASSIGNED: { label: 'Ditugaskan', color: COLORS.status.assigned.text, bg: 'bg-amber-50', dot: 'bg-amber-600' },
-    START: { label: 'Mulai', color: COLORS.status.start.text, bg: 'bg-purple-50', dot: 'bg-purple-600' },
-    SUBMITTED: { label: 'Dikirim', color: COLORS.status.submitted.text, bg: 'bg-emerald-50', dot: 'bg-emerald-600' },
-    VERIFIED: { label: 'Terverifikasi', color: COLORS.status.verified.text, bg: 'bg-teal-50', dot: 'bg-teal-600' },
+import { getStatusConfig } from '../../constants';
 
-    // --- Application Statuses (Fallback) ---
-    PENDING: { label: 'Menunggu', color: COLORS.status.pending.text, bg: 'bg-slate-50', dot: 'bg-slate-400' },
-    APPROVED: { label: 'Disetujui', color: COLORS.status.verified.text, bg: 'bg-emerald-50', dot: 'bg-emerald-600' },
-    REJECTED: { label: 'Ditolak', color: COLORS.status.rejected.text, bg: 'bg-rose-50', dot: 'bg-rose-600' },
+import type { CustomerListItem } from '../types/customer';
+import type { Application } from '../../gen/application/v1/application_pb';
+import type { ApplicationSurvey } from '../../gen/survey/v1/survey_pb';
+
+const STATUS_SORT_ORDER: Record<string, number> = {
+    IN_PROGRESS: 0,
+    START: 1,
+    ASSIGNED: 2,
+    NEW: 3,
 };
 
 export function DashboardScreen() {
+
     const { surveyorId } = useAuth();
     const { navigate } = useAppNavigator();
 
-    // Data Fetching
+    const [searchQuery, setSearchQuery] = useState('');
+    const [applicantTypeMap, setApplicantTypeMap] = useState<Record<string, string>>({});
+
     const applicationsQuery = useApplications();
     const surveysQuery = useMySurveys(surveyorId || '');
-    const { startSurvey, assignSurvey, loading: actionLoading } = useSurveyControl();
 
-    // Data Processing
     const isLoading = applicationsQuery.isLoading || surveysQuery.isLoading;
-    const applications = useMemo(() => applicationsQuery.data || [], [applicationsQuery.data]);
-    const surveys = useMemo(() => surveysQuery.data || [], [surveysQuery.data]);
-    const hasError = !!(applicationsQuery.error || surveysQuery.error);
+    const isRefreshing = applicationsQuery.isRefetching || surveysQuery.isRefetching;
 
-    // Customer list — merge applications + surveys, sorted by survey status
-    const customerList = useMemo(() => {
-        return applications.map(app => {
-            const survey = surveys.find(s => s.applicationId === app.id);
+    useEffect(() => {
+
+        const apps =
+            applicationsQuery.data?.pages.flatMap(page => page.applications) || [];
+
+        const uniqueIds =
+            [...new Set(apps.map(a => a.applicantId).filter(Boolean))];
+
+        const newIds = uniqueIds.filter(id => !applicantTypeMap[id]);
+
+        if (newIds.length === 0) return;
+
+        Promise.all(
+            newIds.map(id =>
+                applicantRepo.getApplicant(id)
+                    .then(applicant => ({ id, type: applicant.type }))
+                    .catch(() => ({ id, type: '' })),
+            ),
+        ).then(results => {
+
+            const newMap: Record<string, string> = {};
+
+            results.forEach(r => {
+                newMap[r.id] = r.type;
+            });
+
+            setApplicantTypeMap(prev => ({ ...prev, ...newMap }));
+
+        });
+
+    }, [applicationsQuery.data]);
+
+    const customerList = useMemo((): CustomerListItem[] => {
+
+        const apps: Application[] =
+            applicationsQuery.data?.pages.flatMap(p => p.applications) || [];
+
+        const surveys: ApplicationSurvey[] =
+            surveysQuery.data || [];
+
+        const mapped: CustomerListItem[] = apps.map(app => {
+
+            const survey =
+                surveys.find(s => s.applicationId === app.id);
+
+            const applicantType =
+                applicantTypeMap[app.applicantId] || '';
+
             return {
                 app,
                 survey,
-                display: ApplicationMapper.toDisplay(app)
+                display: ApplicationMapper.toDisplay(app, applicantType),
             };
-        }).sort((a, b) => {
-            // Sort order by survey status
-            const order: Record<string, number> = {
-                'IN_PROGRESS': 0,
-                'START': 1,
-                'ASSIGNED': 2,
-                'NEW': 3,
-                'SUBMITTED': 4,
-                'VERIFIED': 5
-            };
-            const statusA = a.survey?.status || 'NEW';
-            const statusB = b.survey?.status || 'NEW';
-            return (order[statusA] ?? 99) - (order[statusB] ?? 99);
+
         });
-    }, [applications, surveys]);
+
+        const query = searchQuery.toLowerCase();
+
+        const filtered =
+            query.length > 0
+                ? mapped.filter(item =>
+                    item.display.applicantName.toLowerCase().includes(query) ||
+                    item.app.id.toLowerCase().includes(query),
+                )
+                : mapped;
+
+        return filtered.sort(
+            (a, b) =>
+                (STATUS_SORT_ORDER[a.survey?.status || 'NEW'] ?? 99) -
+                (STATUS_SORT_ORDER[b.survey?.status || 'NEW'] ?? 99),
+        );
+
+    }, [applicationsQuery.data, surveysQuery.data, searchQuery, applicantTypeMap]);
 
     const stats = useMemo(() => ({
-        total: applications.length,
-        active: surveys.filter(s => s.status === 'IN_PROGRESS').length,
-        completed: surveys.filter(s => ['SUBMITTED', 'VERIFIED'].includes(s.status)).length,
-    }), [applications, surveys]);
 
-    const onRefresh = useCallback(() => {
+        total:
+            applicationsQuery.data?.pages.flatMap(p => p.applications).length || 0,
+
+        active:
+            (surveysQuery.data || []).filter(s => s.status === 'IN_PROGRESS').length,
+
+        completed:
+            (surveysQuery.data || []).filter(s =>
+                ['SUBMITTED', 'VERIFIED'].includes(s.status),
+            ).length,
+
+    }), [applicationsQuery.data, surveysQuery.data]);
+
+    const handleAction = (item: CustomerListItem) => {
+
+        navigate('ApplicationDetail', {
+            applicationId: item.app.id,
+            surveyId: item.survey?.id,
+        });
+
+    };
+
+    const handleLoadMore = () => {
+
+        if (applicationsQuery.hasNextPage && !applicationsQuery.isFetchingNextPage) {
+            applicationsQuery.fetchNextPage();
+        }
+
+    };
+
+    const handleRefresh = () => {
+
         applicationsQuery.refetch();
         surveysQuery.refetch();
-    }, [applicationsQuery, surveysQuery]);
 
-    const handleAction = async (item: any) => {
-        if (!surveyorId) return;
-        const { app, survey } = item;
-        const DEFAULT_TEMPLATE_ID = '0195d1d2-0001-7000-bb34-000000000001';
-
-        try {
-            let activeSurvey = survey;
-
-            // Assign new survey if none exists
-            if (!activeSurvey) {
-                activeSurvey = await assignSurvey(
-                    app.id,
-                    DEFAULT_TEMPLATE_ID,
-                    'FIELD_SURVEY',
-                    surveyorId,
-                    'Survey Lapangan Langsung'
-                );
-            }
-
-            if (activeSurvey.status === 'ASSIGNED') {
-                await startSurvey(activeSurvey.id, surveyorId);
-            }
-
-            navigate('SurveyForm', {
-                surveyId: activeSurvey.id,
-                applicationId: app.id,
-            });
-        } catch (err) {
-            console.error('[Dashboard] Action Error:', err);
-        }
     };
 
-    return (
-        <SidebarLayout headerTitle="Dashboard Credit Analyst">
-            <ScrollView
-                className="flex-1 bg-slate-50"
-                contentContainerStyle={{ paddingBottom: 100 }}
-                refreshControl={<RefreshControl refreshing={isLoading} onRefresh={onRefresh} tintColor="#2563EB" />}
-            >
-                {/* Brand Header */}
-                <View className="bg-white px-6 pt-4 pb-6 border-b border-slate-100 mb-6">
-                    <View className="flex-row justify-between items-center">
-                        <View>
-                            <Text className="text-slate-400 text-[10px] font-bold uppercase tracking-[3px] mb-1">Credit Survey Management</Text>
-                            <Text className="text-dark text-2xl font-black italic">Survey Nasabah</Text>
-                        </View>
-                    </View>
-                </View>
-
-                <View className="px-6">
-                    {/* Stat Cards */}
-                    <View className="flex-row gap-3 mb-8">
-                        <PremiumStatCard label="Total Nasabah" value={stats.total} accentColor="#64748B" />
-                        <PremiumStatCard label="Survey Aktif" value={stats.active} accentColor="#2563EB" />
-                        <PremiumStatCard label="Selesai" value={stats.completed} accentColor="#059669" />
-                    </View>
-
-                    {/* Section Header */}
-                    <View className="flex-row justify-between items-center mb-5">
-                        <View>
-                            <Text className="text-dark text-xl font-black">List Nasabah</Text>
-                            <Text className="text-slate-400 font-bold text-[10px] mt-0.5 uppercase tracking-wider">Calon Nasabah</Text>
-                        </View>
-                        <Search color="#94A3B8" size={20} />
-                    </View>
-
-                    {/* Connectivity Error Warning */}
-                    {hasError && <ErrorAlert message={applicationsQuery.error?.message || surveysQuery.error?.message} />}
-
-                    {/* Customer List Rendering */}
-                    {customerList.length === 0 && !isLoading ? (
-                        <View className="bg-white p-12 rounded-3xl items-center border border-slate-100 mt-2">
-                            <ClipboardList color="#E2E8F0" size={56} />
-                            <Text className="text-slate-400 mt-5 text-center font-bold text-xs">Database Nasabah Kosong</Text>
-                        </View>
-                    ) : (
-                        customerList.map((item) => (
-                            <PremiumCustomerCard
-                                key={item.app.id}
-                                item={item}
-                                onAction={() => handleAction(item)}
-                            />
-                        ))
-                    )}
-                </View>
-
-                {actionLoading && (
-                    <View className="mt-6 items-center">
-                        <ActivityIndicator size="small" color="#2563EB" />
-                        <Text className="text-[10px] text-slate-400 font-bold mt-2 uppercase tracking-widest">Memproses...</Text>
-                    </View>
-                )}
-            </ScrollView>
-        </SidebarLayout>
-    );
-}
-
-// ─── Internal Components ───────────────────────────────────────────────────
-
-function PremiumStatCard({ label, value, accentColor }: { label: string, value: number, accentColor: string }) {
-    return (
-        <View className="flex-1 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex-col gap-2">
-            <View className="w-5 h-1 rounded-full" style={{ backgroundColor: accentColor }} />
-            <View>
-                <Text className="text-2xl font-black text-dark leading-7">{value}</Text>
-                <Text className="text-[9px] text-slate-400 font-bold uppercase tracking-tight mt-1">{label}</Text>
-            </View>
-        </View>
-    );
-}
-
-function PremiumCustomerCard({ item, onAction }: { item: any, onAction: () => void }) {
-    const { app, survey, display } = item;
-    const statusKey = survey?.status || display.status || 'PENDING';
-    const config = STATUS_CONFIG[statusKey] || {
-        label: statusKey,
-        color: '#6B7280',
-        bg: 'bg-slate-50',
-        dot: 'bg-slate-400'
-    };
-    const isCompleted = ['SUBMITTED', 'VERIFIED'].includes(statusKey);
+    const showSkeletons = isLoading || isRefreshing;
 
     return (
-        <View className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 mb-3">
-            <View className="flex-row justify-between items-start mb-4">
-                <View className="flex-row items-center flex-1 pr-2">
-                    <View className="w-10 h-10 rounded-xl bg-slate-50 items-center justify-center border border-slate-100">
-                        <Text className="text-slate-600 font-black text-base">{display.applicantName.charAt(0)}</Text>
-                    </View>
-                    <View className="ml-3 flex-1">
-                        <Text className="text-dark font-bold text-[14px]" numberOfLines={1}>{display.applicantName}</Text>
-                        <Text className="text-slate-400 font-medium text-[10px] tracking-wider mt-0.5 uppercase">
-                            #{display.displayId}
+
+        <SidebarLayout headerTitle="Dashboard">
+
+            <FlatList
+                data={showSkeletons ? [] : customerList}
+                keyExtractor={item => item.app.id}
+                contentContainerStyle={{ paddingBottom: 60 }}
+                refreshControl={
+                    <RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} />
+                }
+                onEndReached={handleLoadMore}
+                onEndReachedThreshold={0.3}
+
+                ListHeaderComponent={
+
+                    <View style={{ paddingHorizontal: 24, paddingTop: 20 }}>
+
+                        <Text style={{
+                            fontSize: 26,
+                            fontWeight: '800',
+                            color: '#0F172A',
+                            marginBottom: 6
+                        }}>
+                            Survey Nasabah
                         </Text>
+
+                        <Text style={{
+                            fontSize: 13,
+                            color: '#64748B',
+                            marginBottom: 24
+                        }}>
+                            Monitoring dan kelola survey kredit nasabah
+                        </Text>
+
+                        <View style={{
+                            flexDirection: 'row',
+                            gap: 12,
+                            marginBottom: 24
+                        }}>
+
+                            <StatCard label="Total" value={stats.total} />
+                            <StatCard label="Aktif" value={stats.active} />
+                            <StatCard label="Selesai" value={stats.completed} />
+
+                        </View>
+
+                        <View style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            backgroundColor: '#F8FAFC',
+                            borderRadius: 14,
+                            paddingHorizontal: 14,
+                            height: 46,
+                            marginBottom: 18
+                        }}>
+
+                            <Search size={18} color="#94A3B8" />
+
+                            <TextInput
+                                placeholder="Cari nasabah..."
+                                value={searchQuery}
+                                onChangeText={setSearchQuery}
+                                style={{
+                                    flex: 1,
+                                    marginLeft: 10,
+                                    fontSize: 14,
+                                    color: '#0F172A'
+                                }}
+                            />
+
+                            {searchQuery !== '' && (
+
+                                <TouchableOpacity onPress={() => setSearchQuery('')}>
+                                    <X size={18} color="#94A3B8" />
+                                </TouchableOpacity>
+
+                            )}
+
+                        </View>
+
+                        <Text style={{
+                            fontSize: 16,
+                            fontWeight: '700',
+                            color: '#0F172A',
+                            marginBottom: 12
+                        }}>
+                            Daftar Nasabah
+                        </Text>
+
+                        {showSkeletons && (
+                            <>
+                                <SkeletonCard />
+                                <SkeletonCard />
+                                <SkeletonCard />
+                            </>
+                        )}
+
                     </View>
+
+                }
+
+                renderItem={({ item }) => (
+
+                    <View style={{ paddingHorizontal: 24, marginBottom: 12 }}>
+                        <CustomerCard item={item} onPress={() => handleAction(item)} />
+                    </View>
+
+                )}
+
+                ListEmptyComponent={() => !showSkeletons && (
+
+                    <View style={{
+                        alignItems: 'center',
+                        paddingTop: 80
+                    }}>
+
+                        <Text style={{
+                            fontSize: 15,
+                            color: '#94A3B8'
+                        }}>
+                            Tidak ada data
+                        </Text>
+
+                    </View>
+
+                )}
+
+                ListFooterComponent={() =>
+
+                    applicationsQuery.isFetchingNextPage ? (
+
+                        <View style={{ paddingVertical: 24 }}>
+                            <ActivityIndicator color="#2563EB" />
+                        </View>
+
+                    ) : <View style={{ height: 40 }} />
+
+                }
+
+            />
+
+        </SidebarLayout>
+
+    );
+}
+
+const CustomerCard = React.memo(
+    ({ item, onPress }: { item: CustomerListItem, onPress: () => void }) => {
+
+        const { display, survey, app } = item;
+
+        const statusKey = survey?.status || 'NEW';
+
+        const config = getStatusConfig(statusKey);
+
+        return (
+
+            <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={onPress}
+                style={{
+                    backgroundColor: '#FFFFFF',
+                    borderRadius: 18,
+                    padding: 16,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    shadowColor: '#000',
+                    shadowOpacity: 0.05,
+                    shadowRadius: 10,
+                    shadowOffset: { width: 0, height: 3 },
+                    elevation: 2
+                }}
+            >
+
+                <View style={{
+                    width: 44,
+                    height: 44,
+                    borderRadius: 12,
+                    backgroundColor: '#F1F5F9',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginRight: 12
+                }}>
+                    <Text style={{
+                        fontWeight: '700',
+                        fontSize: 16,
+                        color: '#0F172A'
+                    }}>
+                        {display.applicantName.charAt(0)}
+                    </Text>
                 </View>
-                <View className={`flex-row items-center px-2.5 py-1 rounded-full ${config.bg}`}>
-                    <View className={`w-1.5 h-1.5 rounded-full ${config.dot} mr-2`} />
-                    <Text className="text-[10px] font-black tracking-tight uppercase" style={{ color: config.color }}>
+
+                <View style={{ flex: 1 }}>
+
+                    <Text
+                        numberOfLines={1}
+                        style={{
+                            fontWeight: '700',
+                            fontSize: 15,
+                            color: '#0F172A'
+                        }}
+                    >
+                        {display.applicantName}
+                    </Text>
+
+                    <Text style={{
+                        fontSize: 12,
+                        color: '#64748B',
+                        marginTop: 3
+                    }}>
+                        {display.amount}
+                    </Text>
+
+                </View>
+
+                <View style={{
+                    backgroundColor: config.bg,
+                    paddingHorizontal: 8,
+                    paddingVertical: 4,
+                    borderRadius: 8,
+                    marginRight: 8
+                }}>
+                    <Text style={{
+                        fontSize: 10,
+                        fontWeight: '700',
+                        color: config.color
+                    }}>
                         {config.label}
                     </Text>
                 </View>
-            </View>
 
-            <View className="mb-4 bg-slate-50/50 p-3 rounded-xl border border-slate-100">
-                <View>
-                    <Text className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">Jumlah pengajuan</Text>
-                    <Text className="text-dark font-black text-[12px] mt-0.5">{display.amount}</Text>
-                </View>
-            </View>
+                <ChevronRight size={18} color="#CBD5E1" />
 
-            {!isCompleted ? (
-                <TouchableOpacity
-                    onPress={onAction}
-                    className="w-full py-3.5 rounded-xl items-center shadow-lg shadow-blue-100"
-                    style={{ backgroundColor: config.color === '#6B7280' ? '#2563EB' : config.color }}
-                >
-                    <Text className="text-white font-black text-[11px] uppercase tracking-widest">
-                        {statusKey === 'IN_PROGRESS' ? 'Lanjutkan Survey →' :
-                            !survey ? 'Mulai Survey →' :
-                                statusKey === 'ASSIGNED' ? 'Terima & Mulai →' : 'Buka Survey →'}
-                    </Text>
-                </TouchableOpacity>
-            ) : (
-                <View className="bg-emerald-50 py-3 rounded-xl items-center border border-emerald-100">
-                    <View className="flex-row items-center">
-                        <CheckCircle size={14} color="#059669" />
-                        <Text className="text-emerald-600 font-black text-[11px] uppercase tracking-widest ml-2">Survey Selesai</Text>
-                    </View>
-                </View>
-            )}
-        </View>
-    );
-}
+            </TouchableOpacity>
 
-function ErrorAlert({ message }: { message?: string }) {
+        );
+
+    });
+
+const SkeletonCard = () => {
+
+    const pulse = useRef(new Animated.Value(0.3)).current;
+
+    useEffect(() => {
+
+        Animated.loop(
+
+            Animated.sequence([
+                Animated.timing(pulse, { toValue: 0.7, duration: 700, useNativeDriver: true }),
+                Animated.timing(pulse, { toValue: 0.3, duration: 700, useNativeDriver: true })
+            ])
+
+        ).start();
+
+    }, []);
+
     return (
-        <View className="bg-rose-50 p-4 rounded-2xl mb-4 border border-rose-100 flex-row items-center">
-            <Info color="#e11d48" size={16} />
-            <Text className="text-rose-600 font-bold text-[10px] ml-2 flex-1">
-                Koneksi Bermasalah: {message || 'Data mungkin tidak akurat'}
-            </Text>
-        </View>
+
+        <Animated.View
+            style={{
+                opacity: pulse,
+                backgroundColor: '#FFF',
+                borderRadius: 18,
+                height: 72,
+                marginBottom: 12
+            }}
+        />
+
     );
-}
+
+};
+
+const StatCard = ({ label, value }: { label: string, value: number }) => (
+
+    <View style={{
+        flex: 1,
+        backgroundColor: '#FFFFFF',
+        padding: 16,
+        borderRadius: 16,
+        shadowColor: '#000',
+        shadowOpacity: 0.04,
+        shadowRadius: 8,
+        shadowOffset: { width: 0, height: 2 },
+        elevation: 1
+    }}>
+
+        <Text style={{
+            fontSize: 20,
+            fontWeight: '800',
+            color: '#0F172A'
+        }}>
+            {value}
+        </Text>
+
+        <Text style={{
+            fontSize: 11,
+            color: '#64748B',
+            marginTop: 4
+        }}>
+            {label}
+        </Text>
+
+    </View>
+
+);

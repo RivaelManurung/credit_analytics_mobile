@@ -70,6 +70,14 @@ service SurveyService {
     };
   }
 
+  // Batch submit — mobile mengirim semua jawaban per section sekaligus
+  rpc SubmitSurveyAnswers (SubmitSurveyAnswersRequest) returns (SubmitSurveyAnswersResponse) {
+    option (google.api.http) = {
+      post: "/v1/surveys/{survey_id}/answers/batch"
+      body: "*"
+    };
+  }
+
   rpc UploadSurveyEvidence (UploadSurveyEvidenceRequest) returns (SurveyEvidence) {
     option (google.api.http) = {
       post: "/v1/surveys/{survey_id}/evidences"
@@ -267,6 +275,24 @@ message SubmitSurveyAnswerRequest {
   string answer_number = 4;
   bool answer_boolean = 5;
   string answer_date = 6;
+}
+
+// Batch: submit semua jawaban per section sekaligus
+message SubmitSurveyAnswersRequest {
+  string survey_id = 1;
+  repeated SurveyAnswerItem answers = 2;
+}
+
+message SurveyAnswerItem {
+  string question_id = 1;
+  string answer_text = 2;
+  string answer_number = 3;
+  bool answer_boolean = 4;
+  string answer_date = 5;
+}
+
+message SubmitSurveyAnswersResponse {
+  repeated SurveyAnswer answers = 1;
 }
 
 message UploadSurveyEvidenceRequest {

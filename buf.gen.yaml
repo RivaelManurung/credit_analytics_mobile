@@ -1,12 +1,10 @@
-version: v1
+version: v2
+inputs:
+  - module: buf.build/dots-credit-analytics/credit-analytics
 plugins:
-  - name: es
+  - remote: buf.build/connectrpc/es:v1.6.0
     out: src/gen
-    opt: 
-      - target=ts
-      - import_extension=none
-  - name: connect-es
+    opt: target=ts,import_extension=none
+  - remote: buf.build/bufbuild/es:v1.10.0
     out: src/gen
-    opt: 
-      - target=ts
-      - import_extension=none
+    opt: target=ts,import_extension=none

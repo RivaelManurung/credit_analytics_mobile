@@ -1,0 +1,2 @@
+﻿src/presentation/screens/ApplicationDetailScreen.tsx(41,75): error TS2339: Property 'applicantType' does not exist on type 'Applicant'.
+src/presentation/screens/DashboardScreen.tsx(66,43): error TS2339: Property 'applicantType' does not exist on type 'Applicant'.
