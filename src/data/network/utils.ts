@@ -1,20 +1,24 @@
 export function scrubJson(data: any): any {
     if (!data || typeof data !== 'object' || data === null) return data;
 
-    // Handle Arrays correctly
     if (Array.isArray(data)) {
         return data.map(item => scrubJson(item));
     }
 
-    const scrubbed = { ...data } as any;
-    for (const key in scrubbed) {
-        const val = scrubbed[key];
-        // Remove empty dates or empty strings
+    const scrubbed: any = {};
+    for (const key in data) {
+        let val = data[key];
+
+        // 1. Scrub values (dates, strings)
         if (typeof val === 'string' && (val.startsWith('0001-01-01') || val === '')) {
-            delete scrubbed[key]; // Let Protobuf use default/empty value
+            continue; // Skip empty/default values
         } else if (typeof val === 'object' && val !== null) {
-            scrubbed[key] = scrubJson(val);
+            val = scrubJson(val);
         }
+
+        // 2. Convert key to camelCase (e.g., option_label -> optionLabel)
+        const camelKey = key.replace(/_([a-z0-9])/g, (_, char) => char.toUpperCase());
+        scrubbed[camelKey] = val;
     }
     return scrubbed;
 }

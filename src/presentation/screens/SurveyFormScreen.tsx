@@ -8,7 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
     ArrowLeft, CheckCircle2, ChevronRight, CheckCircle,
     Send, RefreshCw, AlertCircle, Lock,
-    ChevronDown, Camera, X, ClipboardList,
+    ChevronDown, Camera, X, ClipboardList, Calendar as CalendarIcon,
 } from 'lucide-react-native';
 import { useSurveyControl } from '../hooks/useSurveys';
 import { useAuth } from '../context/AuthContext';
@@ -177,12 +177,15 @@ export function SurveyFormScreen({ surveyId, applicationId, onBack }: Props) {
         }
     };
 
-    // Render logic by State Machine
-    if (machine === 'loading') return <LoadingView insets={insets} onBack={onBack} />;
-    if (machine === 'error') return <ErrorView error={error} onRetry={refetch} onBack={onBack} />;
+    // ── Main Render Structure ───────────────────────────────────────────
+    let content;
 
-    if (machine === 'question' && currentSection) {
-        return (
+    if (machine === 'loading') {
+        content = <LoadingView insets={insets} onBack={onBack} />;
+    } else if (machine === 'error') {
+        content = <ErrorView error={error} onRetry={refetch} onBack={onBack} />;
+    } else if (machine === 'question' && currentSection) {
+        content = (
             <QuestionView
                 insets={insets}
                 section={currentSection}
@@ -194,20 +197,28 @@ export function SurveyFormScreen({ surveyId, applicationId, onBack }: Props) {
                 setLightbox={setLightbox}
             />
         );
+    } else {
+        content = (
+            <View style={{ flex: 1 }}>
+                <ScrollView contentContainerStyle={{ paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
+                    <SurveyHeader insets={insets} survey={survey} stats={stats} onBack={onBack} />
+                    <SurveyProgress stats={stats} />
+                    <SectionList sections={sections} answers={answers} onSelectSection={handleSelectSection} />
+                </ScrollView>
+                <SubmitFooter stats={stats} loading={machine === 'submitting'} onSubmit={handleSubmit} />
+            </View>
+        );
     }
 
     return (
         <View style={{ flex: 1, backgroundColor: COLORS.bg }}>
-            <ScrollView contentContainerStyle={{ paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
-                <SurveyHeader insets={insets} survey={survey} stats={stats} onBack={onBack} />
-                <SurveyProgress stats={stats} />
-                <SectionList sections={sections} answers={answers} onSelectSection={handleSelectSection} />
-            </ScrollView>
-
-            <SubmitFooter stats={stats} loading={machine === 'submitting'} onSubmit={handleSubmit} />
+            {content}
 
             {lightbox && (
-                <ImageLightbox lightbox={lightbox} onClose={() => setLightbox(null)} />
+                <ImageLightbox
+                    lightbox={lightbox}
+                    onClose={() => setLightbox(null)}
+                />
             )}
         </View>
     );
@@ -354,18 +365,52 @@ const QuestionView = React.memo(({ insets, section, qIdx, setQIdx, answers, save
     // Internal state for text input to not lag the UI
     const [localTxt, setLocalTxt] = useState(answers[q?.id] ?? '');
 
-    // Sync localTxt when question changes
+    // Sync localTxt when question changes (with formatting for NUMBER)
     useEffect(() => {
-        setLocalTxt(answers[q?.id] ?? '');
+        const raw = answers[q?.id] ?? '';
+        if (q?.answerType === 'NUMBER' && raw) {
+            // Format existing value with dots
+            const clean = String(raw).replace(/[^0-9]/g, '');
+            setLocalTxt(clean.replace(/\B(?=(\d{3})+(?!\d))/g, '.'));
+        } else {
+            setLocalTxt(raw);
+        }
     }, [q?.id, answers]);
 
     const handleNext = () => {
-        const hasAns = Array.isArray(answers[q.id]) ? answers[q.id].length > 0 : (answers[q.id] !== undefined && answers[q.id] !== null && String(answers[q.id]).trim() !== '');
-        if (!hasAns && String(localTxt).trim() === '') {
+        const answer = answers[q.id];
+        let hasAns = false;
+
+        // Ambil nilai "bersih" (tanpa titik pemisah ribuan) untuk validasi & simpan
+        const rawVal = q.answerType === 'NUMBER' ? String(localTxt).replace(/\./g, '') : String(localTxt);
+        const ansVal = q.answerType === 'NUMBER' ? String(answer || '').replace(/\./g, '') : answer;
+
+        if (q.answerType === 'BOOLEAN') {
+            hasAns = answer !== undefined && answer !== null;
+        } else if (q.answerType === 'IMAGE') {
+            hasAns = Array.isArray(answer) && answer.length > 0;
+        } else {
+            const checkVal = (rawVal || String(ansVal || '')).trim();
+            hasAns = checkVal !== '' && checkVal !== '[]';
+        }
+
+        if (!hasAns) {
             Alert.alert('Belum Dijawab', 'Tolong isi jawaban sebelum melanjutkan.');
             return;
         }
-        if (q.answerType !== 'BOOLEAN' && localTxt !== (answers[q.id] ?? '')) {
+
+        // Validasi Angka yang lebih ketat (menggunakan nilai bersih)
+        if (q.answerType === 'NUMBER') {
+            const numStr = rawVal.trim();
+            const num = parseInt(numStr);
+            if (isNaN(num) || numStr === '') {
+                Alert.alert('Angka Tidak Valid', 'Tolong masukkan format angka yang benar.');
+                return;
+            }
+
+            // Simpan nilai bersih ke DB
+            saveAnswer(q.id, numStr, q.answerType);
+        } else if (q.answerType !== 'BOOLEAN' && localTxt !== (answers[q.id] ?? '')) {
             saveAnswer(q.id, localTxt, q.answerType);
         }
 
@@ -429,141 +474,315 @@ const QuestionView = React.memo(({ insets, section, qIdx, setQIdx, answers, save
 });
 
 const QuestionInput = React.memo(({ q, localTxt, setLocalTxt, answers, saveAnswer, setLightbox }: any) => {
-    const [pickerOpen, setPickerOpen] = useState(false);
-
     if (q.answerType === 'BOOLEAN') {
-        return (
-            <View style={{ flexDirection: 'row', gap: 12 }}>
-                {[{ v: true, label: 'Ya' }, { v: false, label: 'Tidak' }].map(opt => {
-                    const active = answers[q.id] === opt.v;
-                    const color = opt.v ? COLORS.success : COLORS.danger;
-                    return (
-                        <TouchableOpacity key={String(opt.v)}
-                            onPress={() => saveAnswer(q.id, opt.v, 'BOOLEAN')}
-                            style={[s.boolBtn, active && { backgroundColor: color, borderColor: color }]}>
-                            <Text style={[s.boolTxt, { color: active ? COLORS.white : COLORS.sub }]}>{opt.label}</Text>
-                        </TouchableOpacity>
-                    );
-                })}
-            </View>
-        );
+        return <BooleanInput q={q} answers={answers} saveAnswer={saveAnswer} />;
     }
 
     if (q.answerType === 'OPTION' || q.answerType === 'SELECT') {
-        return (
-            <>
-                <TouchableOpacity onPress={() => setPickerOpen(true)} style={s.selectTrigger}>
-                    <Text style={[s.selectVal, !answers[q.id] && { color: COLORS.muted }]}>
-                        {q.options?.find((o: any) => o.optionValue === answers[q.id])?.optionLabel ?? 'Pilih jawaban...'}
-                    </Text>
-                    <ChevronDown color={COLORS.sub} size={18} />
-                </TouchableOpacity>
-                <Modal visible={pickerOpen} transparent animationType="slide">
-                    <Pressable style={s.overlay} onPress={() => setPickerOpen(false)}>
-                        <View style={s.sheet}>
-                            <Text style={s.sheetTitle}>Pilih Opsi</Text>
-                            <FlatList
-                                data={q.options ?? []}
-                                keyExtractor={(o, i) => o.id ?? String(i)}
-                                renderItem={({ item: opt }) => {
-                                    const active = answers[q.id] === opt.optionValue;
-                                    return (
-                                        <TouchableOpacity
-                                            onPress={() => { saveAnswer(q.id, opt.optionValue, 'TEXT'); setPickerOpen(false); }}
-                                            style={[s.sheetItem, active && { backgroundColor: COLORS.primaryL }]}>
-                                            <Text style={[s.sheetItemTxt, active && { color: COLORS.primary, fontWeight: '700' }]}>{opt.optionLabel}</Text>
-                                            {active && <CheckCircle size={15} color={COLORS.primary} />}
-                                        </TouchableOpacity>
-                                    );
-                                }}
-                            />
-                        </View>
-                    </Pressable>
-                </Modal>
-            </>
-        );
+        return <SelectInput q={q} answers={answers} saveAnswer={saveAnswer} />;
+    }
+
+    if (q.answerType === 'DATE') {
+        return <DateInput q={q} answers={answers} saveAnswer={saveAnswer} />;
     }
 
     if (q.answerType === 'IMAGE') {
-        const pickPhoto = async () => {
-            if (Platform.OS === 'android') {
-                const result = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.CAMERA);
-                if (result !== PermissionsAndroid.RESULTS.GRANTED) {
-                    Alert.alert('Izin Ditolak', 'Kamera tidak dapat diakses.');
-                    return;
-                }
-            }
-            launchCamera({ mediaType: 'photo', quality: 0.8, saveToPhotos: false }, (res) => {
-                if (res.didCancel || res.errorCode) return;
-                const uri = res.assets?.[0]?.uri;
-                if (uri) {
-                    const prev = Array.isArray(answers[q.id]) ? answers[q.id] : [];
-                    saveAnswer(q.id, [...prev, uri], 'IMAGE');
-                }
-            });
-        };
-
-        return (
-            <View style={{ gap: 12 }}>
-                {Array.isArray(answers[q.id]) && answers[q.id].length > 0 && (
-                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-                        {answers[q.id].map((uri: string, i: number) => (
-                            <TouchableOpacity key={i} onPress={() => setLightbox({ uris: answers[q.id], index: i })} style={s.thumb}>
-                                <Image source={{ uri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
-                                <TouchableOpacity onPress={() => saveAnswer(q.id, answers[q.id].filter((_: any, j: number) => j !== i), 'IMAGE')} style={s.thumbDel}>
-                                    <X color="#fff" size={11} />
-                                </TouchableOpacity>
-                            </TouchableOpacity>
-                        ))}
-                    </View>
-                )}
-                <TouchableOpacity onPress={pickPhoto} style={s.photoBtn}>
-                    <Camera color={COLORS.primary} size={22} />
-                    <View>
-                        <Text style={s.photoBtnTitle}>{answers[q.id]?.length > 0 ? `Tambah Foto (${answers[q.id].length})` : 'Ambil Foto'}</Text>
-                        <Text style={s.photoBtnSub}>Bisa lebih dari 1 foto</Text>
-                    </View>
-                </TouchableOpacity>
-            </View>
-        );
+        return <ImageInput q={q} answers={answers} saveAnswer={saveAnswer} setLightbox={setLightbox} />;
     }
 
     return (
-        <TextInput
-            style={s.textInput}
-            placeholder={q.answerType === 'NUMBER' ? 'Masukkan angka...' : 'Ketik jawaban...'}
-            placeholderTextColor={COLORS.muted}
-            keyboardType={q.answerType === 'NUMBER' ? 'numeric' : 'default'}
-            multiline={q.answerType !== 'NUMBER'}
-            value={localTxt}
-            onChangeText={setLocalTxt}
-        />
+        <View>
+            <TextInput
+                style={s.textInput}
+                placeholder={q.answerType === 'NUMBER' ? 'Contoh: 1.000.000' : 'Ketik jawaban...'}
+                placeholderTextColor={COLORS.muted}
+                keyboardType={q.answerType === 'NUMBER' ? 'numeric' : 'default'}
+                multiline={q.answerType !== 'NUMBER'}
+                value={localTxt}
+                onChangeText={(v) => {
+                    if (q.answerType === 'NUMBER') {
+                        // Hanya ambil angka
+                        const clean = v.replace(/[^0-9]/g, '');
+                        // Format ribuan dengan titik (contoh: 1.000.000)
+                        const formatted = clean.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+                        setLocalTxt(formatted);
+                    } else {
+                        setLocalTxt(v);
+                    }
+                }}
+            />
+            {q.answerType === 'NUMBER' && localTxt !== '' && (
+                <Text style={{ fontSize: 13, color: COLORS.sub, marginTop: 8, fontWeight: '600' }}>
+                    Rp {localTxt}
+                </Text>
+            )}
+        </View>
     );
 });
 
-const ImageLightbox = React.memo(({ lightbox, onClose }: any) => {
+// ── Input Type Components ──────────────────────────────────────────
+
+const BooleanInput = React.memo(({ q, answers, saveAnswer }: any) => (
+    <View style={{ flexDirection: 'row', gap: 12 }}>
+        {[{ v: true, label: 'Ya' }, { v: false, label: 'Tidak' }].map(opt => {
+            const active = answers[q.id] === opt.v;
+            const color = opt.v ? COLORS.success : COLORS.danger;
+            return (
+                <TouchableOpacity key={String(opt.v)}
+                    onPress={() => saveAnswer(q.id, opt.v, 'BOOLEAN')}
+                    style={[s.boolBtn, active && { backgroundColor: color, borderColor: color }]}>
+                    <Text style={[s.boolTxt, { color: active ? COLORS.white : COLORS.sub }]}>{opt.label}</Text>
+                </TouchableOpacity>
+            );
+        })}
+    </View>
+));
+
+const SelectInput = React.memo(({ q, answers, saveAnswer }: any) => {
+    const [pickerOpen, setPickerOpen] = useState(false);
     return (
-        <Modal visible animationType="fade" transparent>
+        <>
+            <TouchableOpacity onPress={() => setPickerOpen(true)} style={s.selectTrigger}>
+                <Text style={[s.selectVal, !answers[q.id] && { color: COLORS.muted }]}>
+                    {q.options?.find((o: any) => o.optionValue === answers[q.id])?.optionText ||
+                        q.options?.find((o: any) => o.optionValue === answers[q.id])?.optionLabel ||
+                        'Pilih jawaban...'}
+                </Text>
+                <ChevronDown color={COLORS.sub} size={18} />
+            </TouchableOpacity>
+            <Modal visible={pickerOpen} transparent animationType="slide">
+                <Pressable style={s.overlay} onPress={() => setPickerOpen(false)}>
+                    <View style={s.sheet}>
+                        <Text style={s.sheetTitle}>Pilih Opsi</Text>
+                        <FlatList
+                            data={q.options ?? []}
+                            keyExtractor={(o, i) => o.id ?? String(i)}
+                            renderItem={({ item: opt }) => {
+                                const active = answers[q.id] === opt.optionValue;
+                                const label = opt.optionText || opt.optionLabel || opt.optionValue || 'Tanpa Label';
+                                return (
+                                    <TouchableOpacity
+                                        onPress={() => { saveAnswer(q.id, opt.optionValue, 'TEXT'); setPickerOpen(false); }}
+                                        style={[s.sheetItem, active && { backgroundColor: COLORS.primaryL }]}>
+                                        <Text style={[s.sheetItemTxt, active && { color: COLORS.primary, fontWeight: '700' }]}>{label}</Text>
+                                        {active && <CheckCircle size={15} color={COLORS.primary} />}
+                                    </TouchableOpacity>
+                                );
+                            }}
+                        />
+                    </View>
+                </Pressable>
+            </Modal>
+        </>
+    );
+});
+
+const DateInput = React.memo(({ q, answers, saveAnswer }: any) => {
+    const currentVal = answers[q.id] || '';
+    const [showDateModal, setShowDateModal] = useState(false);
+
+    // Internal temp state for values during modal editing
+    const [tempD, setTempD] = useState(currentVal && !currentVal.startsWith('0001') ? currentVal.split('-')[2] : "01");
+    const [tempM, setTempM] = useState(currentVal && !currentVal.startsWith('0001') ? currentVal.split('-')[1] : "01");
+    const [tempY, setTempY] = useState(currentVal && !currentVal.startsWith('0001') ? currentVal.split('-')[0] : String(new Date().getFullYear()));
+
+    const formatDisplay = (iso: string) => {
+        if (!iso || iso.startsWith('0001')) return 'Pilih tanggal...';
+        const [y, m, d] = iso.split('-');
+        return `${d}-${m}-${y}`;
+    };
+
+    const handleConfirm = () => {
+        const d = parseInt(tempD);
+        const m = parseInt(tempM);
+        const y = parseInt(tempY);
+
+        if (isNaN(d) || d < 1 || d > 31) {
+            Alert.alert('Tanggal Tidak Valid', 'Masukkan tanggal antara 1 sampai 31.');
+            return;
+        }
+        if (isNaN(m) || m < 1 || m > 12) {
+            Alert.alert('Bulan Tidak Valid', 'Masukkan bulan antara 1 sampai 12.');
+            return;
+        }
+
+        // Validasi kalender (misal: cek tanggal 31 di bulan yang hanya punya 30 hari)
+        const dateObj = new Date(y, m - 1, d);
+        if (dateObj.getFullYear() !== y || dateObj.getMonth() !== (m - 1) || dateObj.getDate() !== d) {
+            Alert.alert('Format Tidak Valid', 'Kombinasi tanggal tersebut tidak ada dalam kalender.');
+            return;
+        }
+
+        const iso = `${tempY}-${String(tempM).padStart(2, '0')}-${String(tempD).padStart(2, '0')}`;
+        saveAnswer(q.id, iso, 'DATE');
+        setShowDateModal(false);
+    };
+
+    return (
+        <>
+            <TouchableOpacity onPress={() => setShowDateModal(true)} style={s.selectTrigger}>
+                <Text style={[s.selectVal, (!currentVal || currentVal.startsWith('0001')) && { color: COLORS.muted }]}>
+                    {formatDisplay(currentVal)}
+                </Text>
+                <CalendarIcon color={COLORS.primary} size={18} />
+            </TouchableOpacity>
+
+            <Modal visible={showDateModal} transparent animationType="fade">
+                <View style={s.overlay}>
+                    <View style={[s.sheet, { padding: 24, maxHeight: undefined }]}>
+                        <Text style={[s.sheetTitle, { padding: 0, borderBottomWidth: 0, marginBottom: 20 }]}>Pilih Tanggal</Text>
+
+                        <View style={{ flexDirection: 'row', gap: 10, marginBottom: 30 }}>
+                            <View style={{ flex: 1 }}>
+                                <Text style={s.progCardLabel}>Tgl</Text>
+                                <View style={s.selectTrigger}>
+                                    <TextInput
+                                        value={tempD}
+                                        onChangeText={(v) => {
+                                            const clean = v.replace(/[^0-9]/g, '');
+                                            if (clean === '' || (parseInt(clean) >= 0 && parseInt(clean) <= 31)) setTempD(clean);
+                                        }}
+                                        keyboardType="numeric" maxLength={2} placeholder="01"
+                                        style={{ color: COLORS.text, fontWeight: '700', flex: 1, padding: 0 }}
+                                    />
+                                </View>
+                            </View>
+                            <View style={{ flex: 1 }}>
+                                <Text style={s.progCardLabel}>Bln</Text>
+                                <View style={s.selectTrigger}>
+                                    <TextInput
+                                        value={tempM}
+                                        onChangeText={(v) => {
+                                            const clean = v.replace(/[^0-9]/g, '');
+                                            if (clean === '' || (parseInt(clean) >= 0 && parseInt(clean) <= 12)) setTempM(clean);
+                                        }}
+                                        keyboardType="numeric" maxLength={2} placeholder="01"
+                                        style={{ color: COLORS.text, fontWeight: '700', flex: 1, padding: 0 }}
+                                    />
+                                </View>
+                            </View>
+                            <View style={{ flex: 1.5 }}>
+                                <Text style={s.progCardLabel}>Thn</Text>
+                                <View style={s.selectTrigger}>
+                                    <TextInput
+                                        value={tempY}
+                                        onChangeText={(v) => setTempY(v.replace(/[^0-9]/g, ''))}
+                                        keyboardType="numeric" maxLength={4} placeholder="2024"
+                                        style={{ color: COLORS.text, fontWeight: '700', flex: 1, padding: 0 }}
+                                    />
+                                </View>
+                            </View>
+                        </View>
+
+                        <View style={{ flexDirection: 'row', gap: 12 }}>
+                            <TouchableOpacity onPress={() => setShowDateModal(false)} style={[s.btn, { flex: 1, backgroundColor: COLORS.border, marginBottom: 0 }]}>
+                                <Text style={[s.btnTxt, { color: COLORS.text }]}>Batal</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={handleConfirm} style={[s.btn, { flex: 1, marginBottom: 0 }]}>
+                                <Text style={s.btnTxt}>Simpan</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
+        </>
+    );
+});
+
+const ImageInput = React.memo(({ q, answers, saveAnswer, setLightbox }: any) => {
+    const pickPhoto = async () => {
+        if (Platform.OS === 'android') {
+            const result = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.CAMERA);
+            if (result !== PermissionsAndroid.RESULTS.GRANTED) {
+                Alert.alert('Izin Ditolak', 'Kamera tidak dapat diakses.');
+                return;
+            }
+        }
+        launchCamera({ mediaType: 'photo', quality: 0.8, saveToPhotos: false }, (res) => {
+            if (res.didCancel || res.errorCode) return;
+            const uri = res.assets?.[0]?.uri;
+            if (uri) {
+                const prev = Array.isArray(answers[q.id]) ? answers[q.id] : [];
+                saveAnswer(q.id, [...prev, uri], 'IMAGE');
+            }
+        });
+    };
+
+    return (
+        <View style={{ gap: 12 }}>
+            {Array.isArray(answers[q.id]) && answers[q.id].length > 0 && (
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                    {answers[q.id].map((uri: string, i: number) => (
+                        <TouchableOpacity key={i} onPress={() => setLightbox({ uris: answers[q.id], index: i })} style={s.thumb}>
+                            <Image source={{ uri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                            <TouchableOpacity onPress={() => saveAnswer(q.id, answers[q.id].filter((_: any, j: number) => j !== i), 'IMAGE')} style={s.thumbDel}>
+                                <X color="#fff" size={11} />
+                            </TouchableOpacity>
+                        </TouchableOpacity>
+                    ))}
+                </View>
+            )}
+            <TouchableOpacity onPress={pickPhoto} style={s.photoBtn}>
+                <Camera color={COLORS.primary} size={22} />
+                <View>
+                    <Text style={s.photoBtnTitle}>{answers[q.id]?.length > 0 ? `Tambah Foto (${answers[q.id].length})` : 'Ambil Foto'}</Text>
+                    <Text style={s.photoBtnSub}>Bisa lebih dari 1 foto</Text>
+                </View>
+            </TouchableOpacity>
+        </View>
+    );
+});
+
+
+const ImageLightbox = React.memo(({ lightbox, onClose }: any) => {
+    const [activeIndex, setActiveIndex] = useState(lightbox.index || 0);
+
+    const onScroll = (event: any) => {
+        const x = event.nativeEvent.contentOffset.x;
+        const index = Math.round(x / SW);
+        if (index !== activeIndex) {
+            setActiveIndex(index);
+        }
+    };
+
+    return (
+        <Modal visible animationType="fade" transparent statusBarTranslucent>
             <View style={{ flex: 1, backgroundColor: '#000' }}>
-                <View style={[s.lbHeader, { paddingTop: 40 }]}>
-                    <Text style={s.lbCount}>{lightbox.index + 1} / {lightbox.uris.length}</Text>
-                    <TouchableOpacity onPress={onClose}>
-                        <X color="#fff" size={22} />
+                <View style={[s.lbHeader, { paddingTop: Platform.OS === 'ios' ? 60 : 40 }]}>
+                    <Text style={s.lbCount}>{activeIndex + 1} / {lightbox.uris.length}</Text>
+                    <TouchableOpacity
+                        onPress={onClose}
+                        style={{ padding: 8, backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 20 }}
+                    >
+                        <X color="#fff" size={24} />
                     </TouchableOpacity>
                 </View>
+
                 <FlatList
                     data={lightbox.uris}
-                    horizontal pagingEnabled
+                    horizontal
+                    pagingEnabled
                     showsHorizontalScrollIndicator={false}
                     initialScrollIndex={lightbox.index}
                     getItemLayout={(_, i) => ({ length: SW, offset: SW * i, index: i })}
                     keyExtractor={(_, i) => String(i)}
+                    onMomentumScrollEnd={onScroll}
                     renderItem={({ item }) => (
-                        <View style={{ width: SW, justifyContent: 'center', alignItems: 'center' }}>
-                            <Image source={{ uri: item }} style={{ width: SW, height: SH * 0.75, resizeMode: 'contain' }} />
+                        <View style={{ width: SW, height: SH - 100, justifyContent: 'center', alignItems: 'center' }}>
+                            <Image
+                                source={{ uri: item }}
+                                style={{ width: SW, height: SH * 0.8 }}
+                                resizeMode="contain"
+                            />
                         </View>
                     )}
                 />
+
+                <View style={{ paddingBottom: 40, alignItems: 'center' }}>
+                    <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, fontWeight: '600' }}>
+                        Geser untuk melihat foto lainnya
+                    </Text>
+                </View>
             </View>
         </Modal>
     );

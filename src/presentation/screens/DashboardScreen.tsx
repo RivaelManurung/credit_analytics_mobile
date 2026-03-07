@@ -95,25 +95,17 @@ export function DashboardScreen() {
                 missingTypeIds.map(id =>
                     applicantRepo.getApplicant(id)
                         .then(applicant => {
-                            let type = applicant.type || (applicant as any).applicantType || '';
+                            // Ambil tipe murni dari API
+                            let rawType = applicant.type || (applicant as any).applicantType || '';
 
-                            // Fallback 1: Cek details case
-                            if (!type && applicant.details?.case) {
-                                type = applicant.details.case === 'individual' ? 'PERSONAL' : 'COMPANY';
-                            }
+                            // Hapus fallback "individual" -> "PERSONAL" (hardcode)
+                            // Jika API tidak memberikan type, biarkan kosong agar konsisten dengan data asli
 
-                            // Fallback 2: Cek attributes applicant (struktur berbeda dengan ApplicationAttribute)
-                            if (!type && applicant.attributes) {
-                                const attr = (applicant.attributes as any[]).find(a =>
-                                    (a.code === 'applicant_type' || a.id === 'applicant_type' || a.attributeId === 'applicant_type')
-                                );
-                                if (attr) {
-                                    type = typeof attr.value === 'string' ? attr.value : attr.value?.rawValue || '';
-                                }
-                            }
+                            // Normalisasi ke UPPERCASE agar tidak ada duplikat di filter (Personal vs PERSONAL)
+                            const type = rawType.trim().toUpperCase();
 
                             if (!type) {
-                                console.log(`[DEBUG] Applicant ${id} type remains unknown. Details: ${applicant.details?.case}. Attrs:`, applicant.attributes.map(a => (a as any).code || (a as any).attributeId || a.id).join(', '));
+                                console.log(`[DEBUG] Applicant ${id} type remains unknown in API core fields. Attrs:`, applicant.attributes.map(a => (a as any).code || (a as any).attributeId || a.id).join(', '));
                             }
 
                             return { id, type };

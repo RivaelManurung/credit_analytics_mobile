@@ -43,8 +43,7 @@ export class SurveyRepositoryImpl {
         const data = await restFetch<any>(`${this.baseUrl}/v1/surveys/${id}`);
         // Backend may wrap response: { survey: {...} } or return directly
         const payload = data?.survey ?? data;
-        console.log('[REST] getSurvey raw keys:', Object.keys(payload || {}));
-        return ApplicationSurvey.fromJson(payload, { ignoreUnknownFields: true });
+        return ApplicationSurvey.fromJson(scrubJson(payload), { ignoreUnknownFields: true });
     }
 
     async listSurveys(assignedTo?: string, status?: string): Promise<ApplicationSurvey[]> {
@@ -138,9 +137,8 @@ export class SurveyRepositoryImpl {
         const list: any[] = Array.isArray(data) ? data : (data?.sections ?? []);
         const sections = list.map((s: any) => {
             const payload = s?.section ?? s; // unwrap nested if any
-            return SurveySection.fromJson(payload, { ignoreUnknownFields: true });
+            return SurveySection.fromJson(scrubJson(payload), { ignoreUnknownFields: true });
         });
-        console.log(`[REST] listSurveySections: ${sections.length} sections, first keys:`, sections[0] ? Object.keys(sections[0]).slice(0, 5) : []);
         return sections;
     }
 
