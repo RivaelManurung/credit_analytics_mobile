@@ -32,10 +32,13 @@ export function ApplicationDetailScreen() {
     const app = appQuery.data;
     const applicantQuery = useApplicant(app?.applicantId || '');
 
-    const survey = useMemo(
-        () => (surveysQuery.data || []).find(s => s.applicationId === applicationId),
-        [surveysQuery.data, applicationId],
-    );
+    const survey = useMemo(() => {
+        const list = surveysQuery.data || [];
+        if (params?.surveyId) {
+            return list.find(s => s.id === params.surveyId);
+        }
+        return list.find(s => s.applicationId === applicationId);
+    }, [surveysQuery.data, applicationId, params?.surveyId]);
 
     // Resolusi tipe nasabah murni dari backend (cek field type, applicantType, atau struktur details)
     const applicant = applicantQuery.data;
@@ -53,26 +56,39 @@ export function ApplicationDetailScreen() {
     const handleAction = async () => {
         if (!surveyorId || !applicationId) return;
 
-        try {
-            // Survey selalu datang dari backend — jangan assign ulang dari sini.
-            // Jika survey tidak ditemukan, kemungkinan data belum termuat.
-            if (!survey) {
-                Alert.alert(
-                    'Survey Belum Tersedia',
-                    'Survey untuk nasabah ini belum ditemukan. Pastikan sudah ditugaskan dari sistem dan coba refresh halaman.',
-                );
-                return;
-            }
+        if (!survey) {
+            Alert.alert(
+                'Survey Belum Tersedia',
+                'Survey untuk nasabah ini belum ditemukan. Pastikan sudah ditugaskan dari sistem dan coba refresh halaman.',
+            );
+            return;
+        }
 
-            // Jika status ASSIGNED, mulai survey dahulu sebelum buka form
-            if (survey.status === 'ASSIGNED') {
-                await startSurvey(survey.id, surveyorId);
+        const proceedWithSurvey = async () => {
+            try {
+                // Jika status ASSIGNED, mulai survey dahulu sebelum buka form
+                if (survey.status === 'ASSIGNED') {
+                    await startSurvey(survey.id, surveyorId);
+                }
+                navigate('SurveyForm', { surveyId: survey.id, applicationId });
+            } catch (err) {
+                console.error('[Detail] Action Error:', err);
+                Alert.alert('Gagal', 'Terjadi kesalahan saat memulai survey.');
             }
+        };
 
-            navigate('SurveyForm', { surveyId: survey.id, applicationId });
-        } catch (err) {
-            console.error('[Detail] Action Error:', err);
-            Alert.alert('Gagal', 'Terjadi kesalahan saat memulai survey.');
+        if (survey.status === 'ASSIGNED') {
+            Alert.alert(
+                'Mulai Survey',
+                `Apakah Anda yakin ingin memulai survey untuk ${display?.applicantName}?`,
+                [
+                    { text: 'Batal', style: 'cancel' },
+                    { text: 'Mulai', onPress: proceedWithSurvey },
+                ],
+            );
+        } else {
+            // Untuk IN_PROGRESS atau status lainnya, langsung buka form
+            proceedWithSurvey();
         }
     };
 

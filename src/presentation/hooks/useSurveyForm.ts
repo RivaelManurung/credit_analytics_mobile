@@ -10,7 +10,7 @@ export function useSurveyForm(surveyId: string, applicationId: string) {
         enabled: !!applicationId,
     });
 
-    const survey = (surveysQuery.data || []).find((s: any) => s.id === surveyId) || (surveysQuery.data?.[0] as ApplicationSurvey | undefined);
+    const survey = (surveysQuery.data || []).find((s: any) => s.id === surveyId);
 
     // 2. Ambil Sections & Answers secara paralel saat survey ditemukan
     const templateId = survey?.templateId;

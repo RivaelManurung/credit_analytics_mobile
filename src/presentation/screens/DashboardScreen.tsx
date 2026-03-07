@@ -10,6 +10,7 @@ import {
     Animated,
     Modal,
     Pressable,
+    Alert,
 } from 'react-native';
 
 import { SidebarLayout } from '../components/Layout/SidebarLayout';
@@ -236,12 +237,10 @@ export function DashboardScreen() {
     }), [surveysQuery.data]);
 
     const handleAction = (item: CustomerListItem) => {
-
         navigate('ApplicationDetail', {
             applicationId: item.app.id,
             surveyId: item.survey?.id,
         });
-
     };
 
     const handleLoadMore = () => {

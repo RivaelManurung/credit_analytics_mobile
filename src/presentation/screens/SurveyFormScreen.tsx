@@ -4,11 +4,13 @@ import {
     TextInput, Alert, BackHandler, StyleSheet, Dimensions,
     Modal, FlatList, Pressable, Platform, PermissionsAndroid,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
     ArrowLeft, CheckCircle2, ChevronRight, CheckCircle,
     Send, RefreshCw, AlertCircle, Lock,
     ChevronDown, Camera, X, ClipboardList, Calendar as CalendarIcon,
+    ListTodo
 } from 'lucide-react-native';
 import { useSurveyControl } from '../hooks/useSurveys';
 import { useAuth } from '../context/AuthContext';
@@ -41,22 +43,37 @@ export function SurveyFormScreen({ surveyId, applicationId, onBack }: Props) {
     // Custom hook for data fetching (React Query)
     const { survey, sections, rawAnswers, isLoading, isError, error, refetch } = useSurveyForm(surveyId, applicationId);
 
-    // State Machine
     const [machine, setMachine] = useState<MachineState>('loading');
     const [currentSection, setCurrentSection] = useState<any>(null);
     const [qIdx, setQIdx] = useState(0);
     const [answers, setAnswers] = useState<Record<string, any>>({});
+
+    // Reset local state when survey changes to avoid stale pollution
+    useEffect(() => {
+        setAnswers({});
+        setQIdx(0);
+        setCurrentSection(null);
+        setMachine('loading');
+    }, [surveyId]);
     const [lightbox, setLightbox] = useState<{ uris: string[]; index: number } | null>(null);
+    const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+
+    const STORAGE_KEY = `survey_draft_${surveyId}`;
 
     // Debounced API call to prevent spamming server
     const debouncedSave = useMemo(
         () => debounce(async (qId: string, payload: any) => {
+            setSaveStatus('saving');
             try {
                 await submitSurveyAnswer(surveyId, qId, payload);
+                setSaveStatus('saved');
+                // Hide "Tersimpan" after 3 seconds
+                setTimeout(() => setSaveStatus((prev: 'idle' | 'saving' | 'saved' | 'error') => prev === 'saved' ? 'idle' : prev), 3000);
             } catch (err) {
-                console.warn('[DebouncedSave Error]', err);
+                console.warn('[Autosave Error]', err);
+                setSaveStatus('error');
             }
-        }, 800),
+        }, 2000),
         [surveyId, submitSurveyAnswer]
     );
 
@@ -92,14 +109,28 @@ export function SurveyFormScreen({ surveyId, applicationId, onBack }: Props) {
             else initAnswers[qId] = txt ?? num ?? String(boo ?? '');
         });
 
-        setAnswers(initAnswers);
+        // Load and Merge with local draft
+        AsyncStorage.getItem(STORAGE_KEY).then(local => {
+            let finalAnswers = initAnswers;
+            if (local) {
+                try {
+                    const localDraft = JSON.parse(local);
+                    finalAnswers = { ...initAnswers, ...localDraft };
+                } catch (e) {
+                    console.warn('[Storage Parse Error]', e);
+                }
+            }
+            setAnswers(finalAnswers);
+            setMachine('sections');
+        }).catch(() => {
+            setAnswers(initAnswers);
+            setMachine('sections');
+        });
 
         // Start survey if assigned
         if (survey.status === 'ASSIGNED' && surveyorId) {
             startSurvey(surveyId, surveyorId).catch(console.error);
         }
-
-        setMachine('sections');
     }, [isLoading, isError, survey, sections, rawAnswers, surveyorId]); // eslint-disable-line
 
     // Hardware back navigation logic based on state machine
@@ -125,22 +156,30 @@ export function SurveyFormScreen({ surveyId, applicationId, onBack }: Props) {
 
     // Calculate progress stats (memoized)
     const stats = useMemo(() => {
-        let total = 0, done = 0;
+        let total = 0, done = 0, requiredMissing = false;
         sections.forEach(s => {
             const qs = s.questions ?? [];
             total += qs.length;
-            done += qs.filter((q: any) => {
+            qs.forEach((q: any) => {
                 const a = answers[q.id];
-                return a !== undefined && a !== null && a !== '';
-            }).length;
+                const hasVal = a !== undefined && a !== null && a !== '' && (Array.isArray(a) ? a.length > 0 : true);
+                if (hasVal) done++;
+                if (q.isRequired && !hasVal) requiredMissing = true;
+            });
         });
-        return { total, done, pct: total > 0 ? Math.round((done / total) * 100) : 0 };
+        const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+        return { total, done, pct, isComplete: total > 0 && done === total && !requiredMissing };
     }, [sections, answers]);
 
     // Action Handlers
     const saveAnswer = useCallback((qId: string, val: any, type: string) => {
         // Optimistic UI update
-        setAnswers(prev => ({ ...prev, [qId]: val }));
+        setAnswers((prev: Record<string, any>) => {
+            const next = { ...prev, [qId]: val };
+            // Save to local storage as fallback
+            AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next)).catch(console.warn);
+            return next;
+        });
 
         // Prepare DB payload
         const payload: any = {};
@@ -152,7 +191,7 @@ export function SurveyFormScreen({ surveyId, applicationId, onBack }: Props) {
 
         // Debounce API call
         debouncedSave(qId, payload);
-    }, [debouncedSave]);
+    }, [debouncedSave, STORAGE_KEY]);
 
     const handleSelectSection = useCallback((sec: any) => {
         setCurrentSection(sec);
@@ -166,12 +205,20 @@ export function SurveyFormScreen({ surveyId, applicationId, onBack }: Props) {
     }, []);
 
     const handleSubmit = async () => {
+        if (!stats.isComplete) {
+            Alert.alert('Belum Selesai', 'Harap selesaikan semua pertanyaan sebelum mengirim survey.');
+            return;
+        }
+
         setMachine('submitting');
         try {
             await submitSurvey(surveyId, surveyorId!);
             setMachine('success');
+            // Clear local draft on success
+            AsyncStorage.removeItem(STORAGE_KEY).catch(console.warn);
             Alert.alert('Berhasil', 'Survey telah berhasil dikirim.', [{ text: 'OK', onPress: onBack }]);
-        } catch {
+        } catch (err: any) {
+            console.error('[Submit Error]', err);
             setMachine('sections');
             Alert.alert('Gagal', 'Gagal mengirim survey. Silakan coba lagi.');
         }
@@ -195,13 +242,14 @@ export function SurveyFormScreen({ surveyId, applicationId, onBack }: Props) {
                 saveAnswer={saveAnswer}
                 onBack={handleBackToSections}
                 setLightbox={setLightbox}
+                saveStatus={saveStatus}
             />
         );
     } else {
         content = (
             <View style={{ flex: 1 }}>
                 <ScrollView contentContainerStyle={{ paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
-                    <SurveyHeader insets={insets} survey={survey} stats={stats} onBack={onBack} />
+                    <SurveyHeader insets={insets} survey={survey} stats={stats} onBack={onBack} saveStatus={saveStatus} />
                     <SurveyProgress stats={stats} />
                     <SectionList sections={sections} answers={answers} onSelectSection={handleSelectSection} />
                 </ScrollView>
@@ -257,13 +305,20 @@ const ErrorView = React.memo(({ error, onRetry, onBack }: { error: string, onRet
     </View>
 ));
 
-const SurveyHeader = React.memo(({ insets, survey, stats, onBack }: any) => (
+const SurveyHeader = React.memo(({ insets, survey, stats, onBack, saveStatus }: any) => (
     <View style={[s.header, { paddingTop: insets.top + 16 }]}>
         <TouchableOpacity onPress={onBack} style={s.backBtn}>
             <ArrowLeft color={COLORS.text} size={20} />
         </TouchableOpacity>
         <View style={{ flex: 1, marginLeft: 12 }}>
-            <Text style={s.headerSub}>Survey Form</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Text style={s.headerSub}>Survey Form</Text>
+                {saveStatus !== 'idle' && (
+                    <Text style={[s.saveStatus, saveStatus === 'error' && { color: COLORS.danger }]}>
+                        • {saveStatus === 'saving' ? 'Menyimpan...' : saveStatus === 'saved' ? 'Tersimpan' : 'Gagal Simpan'}
+                    </Text>
+                )}
+            </View>
             <Text style={s.headerTitle} numberOfLines={1}>{survey?.applicantName ?? 'Applicant'}</Text>
         </View>
         <View style={[s.badge, stats.pct === 100 && { backgroundColor: COLORS.successL }]}>
@@ -347,20 +402,26 @@ const SectionList = React.memo(({ sections, answers, onSelectSection }: any) => 
 
 const SubmitFooter = React.memo(({ stats, loading, onSubmit }: any) => (
     <View style={s.submitWrap}>
-        <TouchableOpacity onPress={onSubmit} activeOpacity={0.8} style={[s.submitBtn, stats.pct < 100 && { opacity: 0.5 }]}>
+        <TouchableOpacity
+            onPress={onSubmit}
+            activeOpacity={0.8}
+            disabled={!stats.isComplete || loading}
+            style={[s.submitBtn, (!stats.isComplete || loading) && { opacity: 0.5 }]}
+        >
             {loading ? <ActivityIndicator color={COLORS.white} /> : <><Send color={COLORS.white} size={17} /><Text style={s.submitTxt}>Kirim Survey</Text></>}
         </TouchableOpacity>
-        {stats.pct < 100 && (
+        {!stats.isComplete && (
             <Text style={s.submitHint}>Selesaikan semua pertanyaan terlebih dahulu</Text>
         )}
     </View>
 ));
 
-const QuestionView = React.memo(({ insets, section, qIdx, setQIdx, answers, saveAnswer, onBack, setLightbox }: any) => {
+const QuestionView = React.memo(({ insets, section, qIdx, setQIdx, answers, saveAnswer, onBack, setLightbox, saveStatus }: any) => {
     const qs = section.questions ?? [];
     const q = qs[qIdx];
     const isLast = qIdx === qs.length - 1;
     const pct = ((qIdx + 1) / qs.length) * 100;
+    const [isListOpen, setIsListOpen] = useState(false);
 
     // Internal state for text input to not lag the UI
     const [localTxt, setLocalTxt] = useState(answers[q?.id] ?? '');
@@ -423,12 +484,21 @@ const QuestionView = React.memo(({ insets, section, qIdx, setQIdx, answers, save
     return (
         <View style={{ flex: 1, backgroundColor: COLORS.bg }}>
             <View style={[s.qHead, { paddingTop: insets.top + 10 }]}>
-                <View style={s.qHeadRow}>
+                <View style={[s.qHeadRow, { marginBottom: 8 }]}>
                     <TouchableOpacity onPress={onBack} style={s.iconBtn}>
                         <ArrowLeft color={COLORS.text} size={20} />
                     </TouchableOpacity>
-                    <Text style={s.qSectionName} numberOfLines={1}>{section.sectionName}</Text>
-                    <View style={s.iconBtn} />
+                    <View style={{ flex: 1, alignItems: 'center' }}>
+                        <Text style={s.qSectionName} numberOfLines={1}>{section.sectionName}</Text>
+                        {saveStatus !== 'idle' && (
+                            <Text style={[s.saveStatusSmall, saveStatus === 'error' && { color: COLORS.danger }]}>
+                                {saveStatus === 'saving' ? 'Menyimpan...' : saveStatus === 'saved' ? 'Tersimpan' : 'Gagal'}
+                            </Text>
+                        )}
+                    </View>
+                    <TouchableOpacity onPress={() => setIsListOpen(true)} style={s.iconBtn}>
+                        <ListTodo color={COLORS.primary} size={22} />
+                    </TouchableOpacity>
                 </View>
                 <View style={s.progRow}>
                     <Text style={s.progLabel}>{qIdx + 1} / {qs.length}</Text>
@@ -438,6 +508,65 @@ const QuestionView = React.memo(({ insets, section, qIdx, setQIdx, answers, save
                     <Text style={s.progPct}>{Math.round(pct)}%</Text>
                 </View>
             </View>
+
+            <Modal visible={isListOpen} transparent animationType="slide">
+                <Pressable style={s.overlay} onPress={() => setIsListOpen(false)}>
+                    <View style={s.sheet}>
+                        <View style={s.sheetTitleRow}>
+                            <Text style={s.sheetTitle}>Daftar Pertanyaan</Text>
+                            <TouchableOpacity onPress={() => setIsListOpen(false)}>
+                                <X size={20} color={COLORS.sub} />
+                            </TouchableOpacity>
+                        </View>
+                        <FlatList
+                            data={qs}
+                            keyExtractor={(item) => item.id}
+                            contentContainerStyle={{ paddingBottom: 20 }}
+                            renderItem={({ item, index }) => {
+                                const ans = answers[item.id];
+                                const isDone = ans !== undefined && ans !== null && ans !== '' && (Array.isArray(ans) ? ans.length > 0 : true);
+                                const isActive = qIdx === index;
+
+                                // Accessible if it's first OR all previous are done
+                                let isLocked = false;
+                                for (let i = 0; i < index; i++) {
+                                    const prevA = answers[qs[i].id];
+                                    if (prevA === undefined || prevA === null || prevA === '' || (Array.isArray(prevA) && prevA.length === 0)) {
+                                        isLocked = true;
+                                        break;
+                                    }
+                                }
+
+                                return (
+                                    <TouchableOpacity
+                                        onPress={() => {
+                                            if (isLocked) return;
+                                            setQIdx(index);
+                                            setIsListOpen(false);
+                                        }}
+                                        disabled={isLocked}
+                                        style={[
+                                            s.sheetItem,
+                                            isActive && { backgroundColor: COLORS.primaryL },
+                                            isLocked && { opacity: 0.4 }
+                                        ]}>
+                                        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                                            <View style={[s.qCircle, isActive && { backgroundColor: COLORS.primary }, isDone && !isActive && { backgroundColor: COLORS.successL }]}>
+                                                <Text style={[s.qCircleTxt, isActive && { color: '#fff' }, isDone && !isActive && { color: COLORS.success }]}>{index + 1}</Text>
+                                            </View>
+                                            <Text style={[s.sheetItemTxt, isActive && { fontWeight: '700', color: COLORS.primary }]} numberOfLines={1}>
+                                                {item.questionText}
+                                            </Text>
+                                        </View>
+                                        {isDone && <CheckCircle2 size={18} color={COLORS.success} />}
+                                        {isLocked && <Lock size={16} color={COLORS.muted} />}
+                                    </TouchableOpacity>
+                                );
+                            }}
+                        />
+                    </View>
+                </Pressable>
+            </Modal>
 
             <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 20, paddingBottom: 32 }}>
                 <View style={s.qCard}>
@@ -465,7 +594,7 @@ const QuestionView = React.memo(({ insets, section, qIdx, setQIdx, answers, save
                     <ArrowLeft color={COLORS.sub} size={20} />
                 </TouchableOpacity>
                 <TouchableOpacity onPress={handleNext} style={[s.nextBtn, isLast && { backgroundColor: COLORS.success }]}>
-                    <Text style={s.nextBtnTxt}>{isLast ? 'Selesai' : 'Lanjut'}</Text>
+                    <Text style={s.nextBtnTxt}>{isLast ? 'Selesai Bagian' : 'Lanjut'}</Text>
                     <ChevronRight color={COLORS.white} size={18} />
                 </TouchableOpacity>
             </View>
@@ -859,4 +988,9 @@ const s = StyleSheet.create({
     nextBtnTxt: { color: COLORS.white, fontWeight: '800', fontSize: 15 },
     lbHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingBottom: 12 },
     lbCount: { color: '#fff', fontSize: 14, fontWeight: '600' },
+    sheetTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingRight: 20, borderBottomWidth: 1, borderBottomColor: COLORS.border },
+    qCircle: { width: 28, height: 28, borderRadius: 14, backgroundColor: COLORS.border, alignItems: 'center', justifyContent: 'center' },
+    qCircleTxt: { fontSize: 12, fontWeight: '700', color: COLORS.sub },
+    saveStatus: { fontSize: 10, fontWeight: '600', color: COLORS.success, textTransform: 'uppercase', letterSpacing: 0.5 },
+    saveStatusSmall: { fontSize: 10, color: COLORS.success, fontWeight: '700', marginTop: -2 },
 });
