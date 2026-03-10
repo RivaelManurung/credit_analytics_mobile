@@ -32,8 +32,7 @@ import { Application } from '../../gen/application/v1/application_pb';
 import type { ApplicationSurvey } from '../../gen/survey/v1/survey_pb';
 
 type ApplicantFilter = string;
-// Sort order hanya menggunakan status yang diakui backend:
-// UNASSIGNED | ASSIGNED | IN_PROGRESS | SUBMITTED | VERIFIED
+// Status yang diakui backend
 const STATUS_SORT_ORDER: Record<string, number> = {
     IN_PROGRESS: 0,
     ASSIGNED: 1,
@@ -63,7 +62,7 @@ export function DashboardScreen() {
         const currentApps = applicationsQuery.data?.pages.flatMap(page => page.applications) || [];
         const surveys = surveysQuery.data || [];
 
-        // 1. Identifikasi aplikasi yang metadata-nya belum ada di list (pagination) atau extraApps
+        // Identifikasi aplikasi yang belum ada di list
         const missingAppIds = surveys
             .map(s => s.applicationId)
             .filter(id => !currentApps.find(a => a.id === id) && !extraApps[id]);
@@ -81,7 +80,7 @@ export function DashboardScreen() {
                 });
         }
 
-        // 2. Kumpulkan semua applicantId dari SEMUA aplikasi yang kita punya
+        // Kumpulkan semua applicantId dari aplikasi
         const allAvailableApps = [...currentApps, ...Object.values(extraApps)];
         const uniqueIdsForType = [...new Set(
             allAvailableApps
@@ -96,13 +95,13 @@ export function DashboardScreen() {
                 missingTypeIds.map(id =>
                     applicantRepo.getApplicant(id)
                         .then(applicant => {
-                            // Ambil tipe murni dari API
                             let rawType = applicant.type || (applicant as any).applicantType || '';
 
-                            // Hapus fallback "individual" -> "PERSONAL" (hardcode)
-                            // Jika API tidak memberikan type, biarkan kosong agar konsisten dengan data asli
+                            // Fallback: check details.case if primary fields are empty (matches Detail Screen logic)
+                            if (!rawType && (applicant as any).details?.case) {
+                                rawType = (applicant as any).details.case === 'individual' ? 'PERSONAL' : 'COMPANY';
+                            }
 
-                            // Normalisasi ke UPPERCASE agar tidak ada duplikat di filter (Personal vs PERSONAL)
                             const type = rawType.trim().toUpperCase();
 
                             if (!type) {
@@ -158,12 +157,6 @@ export function DashboardScreen() {
         const surveys: ApplicationSurvey[] =
             surveysQuery.data || [];
 
-        // ── Sumber data utama adalah survey yang ditugaskan admin ──────────
-        // Iterate dari surveys (bukan dari apps), sehingga hanya nasabah yang
-        // sudah diassign admin ke surveyor ini yang muncul di dashboard.
-        // Status yang ditampilkan murni dari backend — tidak ada hardcode apapun.
-
-        // Type helper: survey dijamin ada (bukan undefined) di list ini
         type AssignedItem = Omit<CustomerListItem, 'survey'> & {
             survey: ApplicationSurvey;
             applicantType: string;
@@ -211,7 +204,6 @@ export function DashboardScreen() {
             console.log(`[FILTER SUMMARY] Filtered ${filtered.length} customers for type: ${applicantFilter}`);
         }
 
-        // Urutkan berdasarkan status dari backend — murni dari data survey, tanpa hardcode
         return filtered.sort(
             (a, b) =>
                 (STATUS_SORT_ORDER[a.survey.status] ?? 99) -
@@ -503,8 +495,6 @@ const CustomerCard = React.memo(
 
         const { display, survey, app } = item;
 
-        // Survey selalu ada — hanya nasabah yang sudah diassign admin yang muncul di dashboard.
-        // Status diambil murni dari backend, tidak ada hardcode.
         const statusKey = survey?.status ?? 'ASSIGNED';
 
         const config = getStatusConfig(statusKey);

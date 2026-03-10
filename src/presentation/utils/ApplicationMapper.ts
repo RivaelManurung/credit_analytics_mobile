@@ -8,7 +8,7 @@ export interface DisplayApplication {
     status: string;
     amount: string;
     tenor: string;
-    type: string;
+    loanPurpose: string;
     applicantType: string;
     raw: Application;
 }
@@ -18,31 +18,35 @@ export interface DisplayApplication {
  * extracting data from the EAV attributes where necessary.
  * 
  * All fields are derived dynamically from the Application's EAV attributes 
- * or top-level proto fields. Nothing is hardcoded.
+ * or top-level proto fields.
  * 
  * @param app - The Application protobuf object
  * @param applicantType - Optional applicant type from the Applicant entity (e.g. 'personal', 'company')
  */
 export const ApplicationMapper = {
     toDisplay: (app: Application, applicantType?: string): DisplayApplication => {
-        // Preference: top-level field > attribute > default
-        const name = app.applicantName || AttributeUtils.getValue(app.attributes, 'applicant_name') || 'Nasabah Tanpa Nama';
-        const amount = app.loanAmount || AttributeUtils.getValue(app.attributes, 'loan_amount') || '0';
-        const type = app.loanPurpose || AttributeUtils.getValue(app.attributes, 'loan_purpose') || 'Kredit';
+        const name = app.applicantName || AttributeUtils.getValue(app.attributes, 'applicant_name') || '';
+        const amount = app.loanAmount || AttributeUtils.getValue(app.attributes, 'loan_amount') || '';
+        const loanPurposeValue = app.loanPurpose
+            || AttributeUtils.getValue(app.attributes, 'loan_purpose_desc')
+            || AttributeUtils.getValue(app.attributes, 'loan_purpose_name')
+            || AttributeUtils.getValue(app.attributes, 'loan_purpose')
+            || AttributeUtils.getValue(app.attributes, 'tujuan_kredit')
+            || AttributeUtils.getValue(app.attributes, 'keperluan_kredit')
+            || AttributeUtils.getValue(app.attributes, 'keperluan')
+            || AttributeUtils.getValue(app.attributes, 'tujuan')
+            || AttributeUtils.getValue(app.attributes, 'tujuan_penggunaan')
+            || AttributeUtils.getValue(app.attributes, 'purpose')
+            || '';
 
-        // Applicant type dari backend — digunakan apa adanya (PERSONAL, COMPANY, dll)
-        // Jangan di-format agar konsisten dengan availableFilters di Dashboard
         const rawType = applicantType
             || AttributeUtils.getValue(app.attributes, 'applicant_type')
             || '';
 
-        // Label tampilan: hanya capitalize huruf pertama saja untuk keterbacaan UI
-        // tapi rawType tetap disimpan apa adanya untuk keperluan filter/logika
         const displayType = rawType
             ? rawType.charAt(0).toUpperCase() + rawType.slice(1).toLowerCase()
             : '';
 
-        // Extract display ID (prioritize applicant_id as requested)
         const displayId = app.applicantId ||
             AttributeUtils.getValue(app.attributes, 'applicant_id') ||
             AttributeUtils.getValue(app.attributes, 'registration_number') ||
@@ -55,8 +59,8 @@ export const ApplicationMapper = {
             status: app.status || 'PENDING',
             amount: `Rp ${Number(amount).toLocaleString('id-ID')}`,
             tenor: `${app.tenorMonths} Bulan`,
-            type: type,
-            applicantType: displayType ? `${displayType} Survey` : 'Survey',
+            loanPurpose: loanPurposeValue,
+            applicantType: displayType,
             raw: app
         };
     }

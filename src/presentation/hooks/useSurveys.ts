@@ -59,7 +59,6 @@ export function useSurveySections(templateId: string) {
 }
 
 // Combined hook — fetches survey + sections in ONE query using parallel Promise.all
-// templateId is passed explicitly to bypass the getSurvey templateId mapping bug
 export function useSurveyFormData(surveyId: string, templateId: string) {
     return useQuery({
         queryKey: ['surveyForm', surveyId, templateId],
@@ -87,10 +86,8 @@ export function useSurveyControl() {
         mutationFn: ({ id, userId }: { id: string; userId: string }) =>
             surveyRepo.startSurvey(id, userId),
         onSuccess: (data) => {
-            // Only invalidate lists, NOT the detail — so SurveyFormScreen doesn't reset
             if (data) {
                 queryClient.invalidateQueries({ queryKey: surveyKeys.lists() });
-                // Update the cache for this specific survey directly
                 queryClient.setQueryData(surveyKeys.detail(data.id), data);
             }
         }

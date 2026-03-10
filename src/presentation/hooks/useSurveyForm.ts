@@ -3,7 +3,6 @@ import { surveyRepo } from '../../data/repositories';
 import { ApplicationSurvey, SurveySection, SurveyAnswer } from '../../gen/survey/v1/survey_pb';
 
 export function useSurveyForm(surveyId: string, applicationId: string) {
-    // 1. Ambil list survey untuk fallback & dapet survey object
     const surveysQuery = useQuery({
         queryKey: ['surveys', applicationId],
         queryFn: () => surveyRepo.listSurveysByApplication(applicationId),
@@ -12,7 +11,6 @@ export function useSurveyForm(surveyId: string, applicationId: string) {
 
     const survey = (surveysQuery.data || []).find((s: any) => s.id === surveyId);
 
-    // 2. Ambil Sections & Answers secara paralel saat survey ditemukan
     const templateId = survey?.templateId;
 
     const sectionsQuery = useQuery({

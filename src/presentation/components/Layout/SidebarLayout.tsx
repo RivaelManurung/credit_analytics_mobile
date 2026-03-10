@@ -8,9 +8,14 @@ import { LAYOUT } from '../../../constants';
 interface SidebarLayoutProps {
     children: React.ReactNode;
     headerTitle?: string;
+    showMenu?: boolean;
 }
 
-export function SidebarLayout({ children, headerTitle = 'CA Mobile Survey' }: SidebarLayoutProps) {
+export function SidebarLayout({
+    children,
+    headerTitle = 'CA Mobile Survey',
+    showMenu = true
+}: SidebarLayoutProps) {
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const insets = useSafeAreaInsets();
 
@@ -18,7 +23,7 @@ export function SidebarLayout({ children, headerTitle = 'CA Mobile Survey' }: Si
 
     return (
         <View className="flex-1 bg-light">
-            <Header title={headerTitle} onMenuPress={toggleSidebar} />
+            <Header title={headerTitle} onMenuPress={toggleSidebar} showMenu={showMenu} />
 
             <View className="flex-1">
                 {children}

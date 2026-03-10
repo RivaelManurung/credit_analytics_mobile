@@ -40,11 +40,10 @@ export function ApplicationDetailScreen() {
         return list.find(s => s.applicationId === applicationId);
     }, [surveysQuery.data, applicationId, params?.surveyId]);
 
-    // Resolusi tipe nasabah murni dari backend (cek field type, applicantType, atau struktur details)
     const applicant = applicantQuery.data;
     let rawApplicantType = applicant?.type || (applicant as any)?.applicantType || '';
     if (!rawApplicantType && applicant?.details.case) {
-        rawApplicantType = applicant.details.case === 'individual' ? 'PERSONAL' : 'COMPANY';
+        rawApplicantType = applicant.details.case === 'individual' ? 'personal' : 'company';
     }
 
     const display: DisplayApplication | null = useMemo(
@@ -66,7 +65,6 @@ export function ApplicationDetailScreen() {
 
         const proceedWithSurvey = async () => {
             try {
-                // Jika status ASSIGNED, mulai survey dahulu sebelum buka form
                 if (survey.status === 'ASSIGNED') {
                     await startSurvey(survey.id, surveyorId);
                 }
@@ -87,7 +85,6 @@ export function ApplicationDetailScreen() {
                 ],
             );
         } else {
-            // Untuk IN_PROGRESS atau status lainnya, langsung buka form
             proceedWithSurvey();
         }
     };
@@ -95,7 +92,7 @@ export function ApplicationDetailScreen() {
     // ── Loading State ────────────────────────────────────────────────────
     if (appQuery.isLoading || (surveysQuery.isLoading && !surveysQuery.data)) {
         return (
-            <SidebarLayout headerTitle="Detail Nasabah">
+            <SidebarLayout headerTitle="Detail Nasabah" showMenu={false}>
                 <View className="flex-1 justify-center items-center bg-slate-50">
                     <ActivityIndicator color="#2563EB" size="large" />
                     <Text className="mt-4 text-slate-400 font-bold uppercase tracking-widest text-[10px]">
@@ -109,7 +106,7 @@ export function ApplicationDetailScreen() {
     // ── Error State ──────────────────────────────────────────────────────
     if (!app || !display) {
         return (
-            <SidebarLayout headerTitle="Detail Nasabah">
+            <SidebarLayout headerTitle="Detail Nasabah" showMenu={false}>
                 <View className="flex-1 justify-center items-center bg-slate-50 p-6">
                     <AlertCircle color="#E11D48" size={48} />
                     <Text className="mt-4 text-slate-900 font-black text-lg text-center">
@@ -126,22 +123,16 @@ export function ApplicationDetailScreen() {
         );
     }
 
-    // Status dari survey backend — fallback ke ASSIGNED (bukan PENDING/NEW)
-    // karena nasabah yang muncul di dashboard sudah pasti ditugaskan.
     const statusKey = survey?.status || 'ASSIGNED';
     const config: StatusStyle = getStatusConfig(statusKey);
     const isCompleted = ['SUBMITTED', 'VERIFIED'].includes(statusKey);
 
     // ── Main Render ──────────────────────────────────────────────────────
     return (
-        <SidebarLayout headerTitle="Detail Profil Nasabah">
+        <SidebarLayout headerTitle="Detail Profil Nasabah" showMenu={false}>
             <ScrollView className="flex-1 bg-slate-50" contentContainerStyle={{ paddingBottom: 120 }}>
                 {/* Header Profile Section */}
                 <View className="bg-white px-6 pt-6 pb-8 border-b border-slate-100 mb-6 shadow-sm">
-                    <TouchableOpacity onPress={() => goBack()} className="mb-6 flex-row items-center">
-                        <ArrowLeft color="#64748B" size={20} />
-                        <Text className="ml-2 text-slate-500 font-bold text-sm">Kembali</Text>
-                    </TouchableOpacity>
 
                     <View className="flex-row items-center mb-6">
                         <View className="w-20 h-20 rounded-[28px] bg-blue-50 items-center justify-center border border-blue-100">
@@ -209,7 +200,7 @@ export function ApplicationDetailScreen() {
                     <DetailItem icon={<User size={18} color="#64748B" />} label="Nama Lengkap" value={display.applicantName} />
                     <DetailItem icon={<Info size={18} color="#64748B" />} label="Tipe Nasabah" value={display.applicantType} />
                     <DetailItem icon={<Info size={18} color="#64748B" />} label="ID Pengajuan" value={app.id} />
-                    <DetailItem icon={<Briefcase size={18} color="#64748B" />} label="Tujuan Kredit" value={display.type} />
+                    <DetailItem icon={<Briefcase size={18} color="#64748B" />} label="Tujuan Kredit" value={survey?.surveyPurpose || display.loanPurpose} />
                     <DetailItem icon={<Clock size={18} color="#64748B" />} label="Status Survey" value={config.label} />
                 </View>
 

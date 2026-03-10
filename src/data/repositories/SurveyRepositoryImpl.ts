@@ -1,9 +1,5 @@
 /**
  * SurveyRepositoryImpl — REST-only implementation.
- *
- * gRPC (Connect-Web) with Railway produces "missing response body" on every call.
- * Removing gRPC eliminates the 5-second timeout overhead that was causing the
- * "stuck loading" issue. REST calls now resolve in 1-3 seconds as expected.
  */
 import { API_URL } from '@env';
 import {

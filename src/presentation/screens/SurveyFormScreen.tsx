@@ -510,7 +510,14 @@ const QuestionView = React.memo(({ insets, section, qIdx, setQIdx, answers, save
             </View>
 
             <Modal visible={isListOpen} transparent animationType="slide">
-                <Pressable style={s.overlay} onPress={() => setIsListOpen(false)}>
+                <View style={s.overlay}>
+                    {/* Backdrop: Absolute fill behind the sheet to catch outside clicks */}
+                    <Pressable
+                        style={StyleSheet.absoluteFill}
+                        onPress={() => setIsListOpen(false)}
+                    />
+
+                    {/* Sheet: The actual content container */}
                     <View style={s.sheet}>
                         <View style={s.sheetTitleRow}>
                             <Text style={s.sheetTitle}>Daftar Pertanyaan</Text>
@@ -521,7 +528,8 @@ const QuestionView = React.memo(({ insets, section, qIdx, setQIdx, answers, save
                         <FlatList
                             data={qs}
                             keyExtractor={(item) => item.id}
-                            contentContainerStyle={{ paddingBottom: 20 }}
+                            contentContainerStyle={{ paddingBottom: 40 }}
+                            showsVerticalScrollIndicator={true}
                             renderItem={({ item, index }) => {
                                 const ans = answers[item.id];
                                 const isDone = ans !== undefined && ans !== null && ans !== '' && (Array.isArray(ans) ? ans.length > 0 : true);
@@ -550,22 +558,31 @@ const QuestionView = React.memo(({ insets, section, qIdx, setQIdx, answers, save
                                             isActive && { backgroundColor: COLORS.primaryL },
                                             isLocked && { opacity: 0.4 }
                                         ]}>
-                                        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                                        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12, paddingRight: 12 }}>
                                             <View style={[s.qCircle, isActive && { backgroundColor: COLORS.primary }, isDone && !isActive && { backgroundColor: COLORS.successL }]}>
                                                 <Text style={[s.qCircleTxt, isActive && { color: '#fff' }, isDone && !isActive && { color: COLORS.success }]}>{index + 1}</Text>
                                             </View>
-                                            <Text style={[s.sheetItemTxt, isActive && { fontWeight: '700', color: COLORS.primary }]} numberOfLines={1}>
+                                            <Text
+                                                style={[
+                                                    s.sheetItemTxt,
+                                                    { flex: 1 },
+                                                    isActive && { fontWeight: '700', color: COLORS.primary }
+                                                ]}
+                                                numberOfLines={2}
+                                            >
                                                 {item.questionText}
                                             </Text>
                                         </View>
-                                        {isDone && <CheckCircle2 size={18} color={COLORS.success} />}
-                                        {isLocked && <Lock size={16} color={COLORS.muted} />}
+                                        <View style={{ width: 20, alignItems: 'center', justifyContent: 'center' }}>
+                                            {isDone && <CheckCircle2 size={18} color={COLORS.success} />}
+                                            {isLocked && <Lock size={16} color={COLORS.muted} />}
+                                        </View>
                                     </TouchableOpacity>
                                 );
                             }}
                         />
                     </View>
-                </Pressable>
+                </View>
             </Modal>
 
             <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 20, paddingBottom: 32 }}>

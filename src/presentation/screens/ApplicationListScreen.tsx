@@ -64,7 +64,7 @@ export const ApplicationListScreen: React.FC = () => {
 
 
     return (
-        <SidebarLayout headerTitle="Database Nasabah">
+        <SidebarLayout headerTitle="Database Nasabah" showMenu={false}>
             <View className="flex-1 bg-slate-50">
                 {/* Brand Header */}
                 <View className="bg-white px-6 pt-6 pb-8 border-b border-slate-100 mb-6">
